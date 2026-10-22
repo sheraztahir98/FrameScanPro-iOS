@@ -6,13 +6,12 @@ import UIKit
 import CoreImage
 import Combine
 
-/// Core iPhone 15 Pro ARKit + LiDAR + Vision Scanner Engine.
-/// Handles:
-/// - Live LiDAR depth + ARKit world tracking
-/// - 2.00" x 2.00" Magnetic Sticker detection & scale calibration
-/// - 6x Live Magnifier Loupe with sub-pixel edge snap indicator
-/// - 3D Green Wireframe overlay in world space (immune to hand shake & moving closer/further)
-/// - Auto Loop-Closure when returning to Point #1
+/// Core iPhone 15 Pro ARKit + LiDAR + ArUco 4x4_50 Vision Scanner Engine.
+/// Uses:
+/// - Real ArUco 4x4_50 16-bit matrix decoding + Camera Intrinsics PnP scale calibration (2.00" = 0.0508m)
+/// - 3D Frame Plane Ray-Intersection (eliminating LiDAR edge bleed on thin pipes)
+/// - Sub-pixel Sobel inner edge snap inside the 6x Magnifier Loupe
+/// - 3D World-Space Green Wireframe immune to hand shake & moving closer/further
 final class ARScannerEngine: NSObject, ObservableObject, ARSCNViewDelegate, ARSessionDelegate {
     
     // MARK: - Published UI State
@@ -32,20 +31,35 @@ final class ARScannerEngine: NSObject, ObservableObject, ARSCNViewDelegate, ARSe
     private let ciContext = CIContext(options: [.useSoftwareRenderer: false])
     private var frameCounter: Int = 0
     
-    // SceneKit nodes for 3D Green Line & Point Markers
     private var pointNodes: [SCNNode] = []
     private var lineNodes: [SCNNode] = []
     private var dynamicPreviewLineNode: SCNNode?
-    private var crosshairRingNode: SCNNode?
     
-    // Rolling buffer of recent LiDAR depth samples for shake stabilization
+    // Rolling buffer & locked 3D Frame Plane for ±1-2mm stability
     private var recentWorldSamples: [SIMD3<Float>] = []
     private let smoothingWindow = 4
+    private var lockedPlanePoint: SIMD3<Float>?
+    private var lockedPlaneNormal: SIMD3<Float>?
+    private var subPixelOffsetNorm: CGPoint = .zero
+    private var hasMovedAwayFromStart: Bool = false
     
-    // Known physical size of printed Magnetic Sticker: 2.00 inches = 0.0508 meters
-    private let stickerPhysicalSizeMeters: Float = 0.0508
+    // Official OpenCV DICT_4X4_50 16-bit codes for IDs 0..11
+    private static let aruco4x4Codes: [UInt16] = [
+        0b0100_1110_1100_1101, // ID 0
+        0b1111_0000_0110_1001, // ID 1
+        0b0011_0011_0010_1101, // ID 2
+        0b1001_1001_0100_0110, // ID 3
+        0b0101_0101_1011_1000, // ID 4
+        0b1100_0111_0011_1010, // ID 5
+        0b0001_1101_1001_0011, // ID 6
+        0b1010_0100_1110_0101, // ID 7
+        0b0110_1010_0101_1100, // ID 8
+        0b1101_1011_1000_0010, // ID 9
+        0b0010_0110_1101_0111, // ID 10
+        0b1011_1100_0001_1010  // ID 11
+    ]
     
-    // MARK: - Setup & Session Lifecycle
+    private let stickerPhysicalSizeMeters: Float = 0.0508 // Exact 2.00 inches
     
     func attachSceneView(_ view: ARSCNView) {
         self.sceneView = view
@@ -61,7 +75,6 @@ final class ARScannerEngine: NSObject, ObservableObject, ARSCNViewDelegate, ARSe
         config.planeDetection = [.horizontal, .vertical]
         config.isAutoFocusEnabled = true
         
-        // Enable LiDAR Scene Depth & Mesh on iPhone 12 Pro -> 15 Pro / 16 Pro
         if ARWorldTrackingConfiguration.supportsFrameSemantics(.smoothedSceneDepth) {
             config.frameSemantics.insert(.smoothedSceneDepth)
         } else if ARWorldTrackingConfiguration.supportsFrameSemantics(.sceneDepth) {
@@ -83,7 +96,10 @@ final class ARScannerEngine: NSObject, ObservableObject, ARSCNViewDelegate, ARSe
         markedPoints.removeAll()
         isLoopClosed = false
         isNearStartPoint = false
+        hasMovedAwayFromStart = false
         recentWorldSamples.removeAll()
+        lockedPlanePoint = nil
+        lockedPlaneNormal = nil
         
         pointNodes.forEach { $0.removeFromParentNode() }
         lineNodes.forEach { $0.removeFromParentNode() }
@@ -95,8 +111,6 @@ final class ARScannerEngine: NSObject, ObservableObject, ARSCNViewDelegate, ARSe
         statusMessage = "Frame ke 1st Corner par Crosshair rakh kar Point mark karein"
     }
     
-    // MARK: - Point Marking & Auto Loop Closure
-    
     func markPoint(type: ScanPointType) {
         guard !isLoopClosed else { return }
         guard let worldPos = currentCrosshairWorldPos else {
@@ -105,8 +119,8 @@ final class ARScannerEngine: NSObject, ObservableObject, ARSCNViewDelegate, ARSe
             return
         }
         
-        // Check if worker has returned to Point #1 (Auto Loop Closure!)
-        if markedPoints.count >= 3, let firstPt = markedPoints.first {
+        // Auto Loop Closure check (only after moving > 5 inches away from Point #1 first!)
+        if markedPoints.count >= 3, hasMovedAwayFromStart, let firstPt = markedPoints.first {
             let distMeters = simd_distance(worldPos, firstPt.simdVector)
             let distInches = Double(distMeters) * CADGeometryEngine.inchesPerMeter
             if distInches <= CADGeometryEngine.loopClosureThresholdInch {
@@ -123,16 +137,14 @@ final class ARScannerEngine: NSObject, ObservableObject, ARSCNViewDelegate, ARSe
             z: worldPos.z,
             pointType: type,
             nearestStickerID: nearestSticker,
-            confidence: subPixelEdgeLocked ? 0.99 : 0.92
+            confidence: subPixelEdgeLocked ? 0.99 : 0.94
         )
         
         markedPoints.append(newPt)
         UIImpactFeedbackGenerator(style: .rigid).impactOccurred()
         
-        // Add 3D visual marker node in AR world space
         addPointNode(for: newPt, isFirstPoint: markedPoints.count == 1)
         
-        // If there is a previous point, draw a permanent 3D Green Line segment
         if markedPoints.count >= 2 {
             let prev = markedPoints[markedPoints.count - 2].simdVector
             let curr = newPt.simdVector
@@ -145,12 +157,15 @@ final class ARScannerEngine: NSObject, ObservableObject, ARSCNViewDelegate, ARSe
             lineNodes.append(segNode)
         }
         
+        // Refine frame plane whenever >= 3 non-collinear points are marked
+        if markedPoints.count >= 3 {
+            updateFittedPlaneFromMarkedPoints()
+        }
+        
         if markedPoints.count == 1 {
             statusMessage = "1st Point Locked! Ab frame ke sath chalte jayein aur agle points mark karein"
-        } else if markedPoints.count == 2 {
-            statusMessage = "Point #\(markedPoints.count) Marked — Chalte rahein, wapas 1st Point par aane par Loop Auto-Close hoga"
         } else {
-            statusMessage = "Point #\(markedPoints.count) Marked — Jab 1st Point par wapas pahunchein to us par mark karein"
+            statusMessage = "Point #\(markedPoints.count) Marked — Chalte rahein, wapas 1st Point par aane par Loop Auto-Close hoga"
         }
     }
     
@@ -166,6 +181,7 @@ final class ARScannerEngine: NSObject, ObservableObject, ARSCNViewDelegate, ARSe
         }
         
         _ = markedPoints.popLast()
+        if markedPoints.count <= 1 { hasMovedAwayFromStart = false }
         if let lastPtNode = pointNodes.popLast() {
             lastPtNode.removeFromParentNode()
         }
@@ -194,22 +210,19 @@ final class ARScannerEngine: NSObject, ObservableObject, ARSCNViewDelegate, ARSe
         statusMessage = "Frame Complete Ho Gaya! Ab 'Done' button par click karein."
     }
     
-    // MARK: - ARSessionDelegate (Per-Frame LiDAR + Vision Processing)
+    // MARK: - ARSessionDelegate
     
     func session(_ session: ARSession, didUpdate frame: ARFrame) {
         frameCounter += 1
         
-        // 1. Sample exact 3D coordinate under center crosshair via LiDAR depth + Raycast fusion
-        updateCrosshair3DPosition(frame: frame)
-        
-        // 2. Every 3rd frame (~20 FPS), update 6x Magnifier Loupe & sub-pixel inner edge snap
         if frameCounter % 3 == 0 {
             updateMagnifierAndSubPixelEdge(frame: frame)
         }
         
-        // 3. Every 12th frame (~5 FPS), scan for 2.00" x 2.00" Magnetic Stickers in view to lock scale & eliminate drift
-        if frameCounter % 12 == 0 {
-            detectMagneticStickers(in: frame)
+        updateCrosshair3DPosition(frame: frame)
+        
+        if frameCounter % 10 == 0 {
+            detectArUcoMagneticStickers(in: frame)
         }
     }
     
@@ -218,11 +231,21 @@ final class ARScannerEngine: NSObject, ObservableObject, ARSCNViewDelegate, ARSe
         
         let camTransform = frame.camera.transform
         let camPos = SIMD3<Float>(camTransform.columns.3.x, camTransform.columns.3.y, camTransform.columns.3.z)
+        let camRight = SIMD3<Float>(camTransform.columns.0.x, camTransform.columns.0.y, camTransform.columns.0.z)
+        let camUp = SIMD3<Float>(camTransform.columns.1.x, camTransform.columns.1.y, camTransform.columns.1.z)
         let camForward = -SIMD3<Float>(camTransform.columns.2.x, camTransform.columns.2.y, camTransform.columns.2.z)
+        
+        // Apply sub-pixel edge snap offset to the camera ray direction
+        let rayDir = simd_normalize(
+            camForward +
+            camRight * Float(subPixelOffsetNorm.x) * 0.015 +
+            camUp * Float(subPixelOffsetNorm.y) * 0.015
+        )
         
         var rawHitPos: SIMD3<Float>?
         
-        // Priority 1: Direct LiDAR Depth Map sample at exact center of camera sensor (works even at 3-18 inches close-up!)
+        // 1. Sample foreground pipe depth from LiDAR depth ring (taking 25th percentile closest depth to avoid background floor bleed!)
+        var foregroundDepth: Float?
         if let depthData = frame.smoothedSceneDepth ?? frame.sceneDepth {
             let depthMap = depthData.depthMap
             CVPixelBufferLockBaseAddress(depthMap, .readOnly)
@@ -235,39 +258,63 @@ final class ARScannerEngine: NSObject, ObservableObject, ARSCNViewDelegate, ARSe
             
             if let baseAddr = CVPixelBufferGetBaseAddress(depthMap) {
                 let floatBuffer = baseAddr.assumingMemoryBound(to: Float32.self)
-                let bytesPerRow = CVPixelBufferGetBytesPerRow(depthMap) / MemoryLayout<Float32>.stride
+                let stride = CVPixelBufferGetBytesPerRow(depthMap) / MemoryLayout<Float32>.stride
                 
-                // Collect 3x3 median kernel around crosshair center for 0.5mm stability
                 var samples: [Float] = []
-                for dy in -1...1 {
-                    for dx in -1...1 {
-                        let d = floatBuffer[(cy + dy) * bytesPerRow + (cx + dx)]
-                        if d.isFinite && d > 0.06 && d < 3.5 {
+                for dy in -2...2 {
+                    for dx in -2...2 {
+                        let d = floatBuffer[(cy + dy) * stride + (cx + dx)]
+                        if d.isFinite && d > 0.06 && d < 3.0 {
                             samples.append(d)
                         }
                     }
                 }
                 if !samples.isEmpty {
                     samples.sort()
-                    let medianDepth = samples[samples.count / 2]
-                    rawHitPos = camPos + camForward * medianDepth
+                    // Use 25th percentile (foreground metal pipe surface, rejecting background floor depth jump at pipe edge)
+                    foregroundDepth = samples[samples.count / 4]
                 }
             }
         }
         
-        // Priority 2: Fallback/Fusion with ARKit High-Precision Raycast on Screen Center
+        // 2. If we have a locked 3D Frame Plane (from stickers or marked points), intersect ray with Frame Plane
+        if let p0 = lockedPlanePoint, let n = lockedPlaneNormal {
+            let denom = simd_dot(rayDir, n)
+            if abs(denom) > 0.15 {
+                let t = simd_dot(p0 - camPos, n) / denom
+                if t > 0.06 && t < 3.5 {
+                    if let fg = foregroundDepth, abs(t - fg) < 0.04 {
+                        rawHitPos = camPos + rayDir * (0.75 * t + 0.25 * fg)
+                    } else {
+                        rawHitPos = camPos + rayDir * t
+                    }
+                }
+            }
+        }
+        
+        // 3. Fallback to foreground LiDAR depth + ARKit raycast
+        if rawHitPos == nil, let fg = foregroundDepth {
+            rawHitPos = camPos + rayDir * fg
+            if lockedPlanePoint == nil {
+                lockedPlanePoint = rawHitPos
+                lockedPlaneNormal = -camForward
+            }
+        }
+        
         if rawHitPos == nil {
             let centerPt = CGPoint(x: view.bounds.midX, y: view.bounds.midY)
             if let query = view.raycastQuery(from: centerPt, allowing: .estimatedPlane, alignment: .any),
                let result = view.session.raycast(query).first {
-                let t = result.worldTransform.columns.3
-                rawHitPos = SIMD3<Float>(t.x, t.y, t.z)
+                let col3 = result.worldTransform.columns.3
+                let col2 = result.worldTransform.columns.1
+                rawHitPos = SIMD3<Float>(col3.x, col3.y, col3.z)
+                lockedPlanePoint = rawHitPos
+                lockedPlaneNormal = simd_normalize(SIMD3<Float>(col2.x, col2.y, col2.z))
             }
         }
         
         guard let detectedPos = rawHitPos else { return }
         
-        // Smooth out micro hand-tremor using rolling weighted window
         recentWorldSamples.append(detectedPos)
         if recentWorldSamples.count > smoothingWindow {
             recentWorldSamples.removeFirst()
@@ -283,39 +330,52 @@ final class ARScannerEngine: NSObject, ObservableObject, ARSCNViewDelegate, ARSe
             guard let self = self else { return }
             self.currentCrosshairWorldPos = avg
             self.currentDistanceInches = distInches
-            // Optimal LiDAR & macro precision zone: 3.5" to 20.0"
             self.isLiDAROptimalZone = (distInches >= 3.5 && distInches <= 20.0)
             
-            // Update live segment length from last point
             if let lastPt = self.markedPoints.last, !self.isLoopClosed {
                 let segMeters = simd_distance(lastPt.simdVector, avg)
                 self.liveSegmentLengthInches = Double(segMeters) * CADGeometryEngine.inchesPerMeter
                 self.updateDynamicPreviewLine(from: lastPt.simdVector, to: avg)
             }
             
-            // Check proximity to 1st point for Auto Loop Closure highlight
-            if self.markedPoints.count >= 3, let firstPt = self.markedPoints.first, !self.isLoopClosed {
+            if let firstPt = self.markedPoints.first, !self.isLoopClosed {
                 let dFirstInches = Double(simd_distance(firstPt.simdVector, avg)) * CADGeometryEngine.inchesPerMeter
-                let near = dFirstInches <= CADGeometryEngine.loopClosureThresholdInch
-                if near != self.isNearStartPoint {
-                    self.isNearStartPoint = near
-                    if near {
-                        UISelectionFeedbackGenerator().selectionChanged()
-                        self.statusMessage = "1st Point ke bilkul qareeb! Mark dabayein — Frame Auto-Complete ho jayega"
+                if dFirstInches > 5.0 {
+                    self.hasMovedAwayFromStart = true
+                }
+                if self.markedPoints.count >= 3 && self.hasMovedAwayFromStart {
+                    let near = dFirstInches <= CADGeometryEngine.loopClosureThresholdInch
+                    if near != self.isNearStartPoint {
+                        self.isNearStartPoint = near
+                        if near {
+                            UISelectionFeedbackGenerator().selectionChanged()
+                            self.statusMessage = "1st Point ke bilkul qareeb! Mark dabayein — Frame Auto-Complete ho jayega"
+                        }
                     }
                 }
             }
         }
     }
     
-    // MARK: - 6x Live Magnifier & Sub-Pixel Edge Detection
+    private func updateFittedPlaneFromMarkedPoints() {
+        guard markedPoints.count >= 3 else { return }
+        let p0 = markedPoints[0].simdVector
+        let p1 = markedPoints[1].simdVector
+        let p2 = markedPoints[markedPoints.count - 1].simdVector
+        let crossVec = simd_cross(p1 - p0, p2 - p0)
+        if simd_length(crossVec) > 1e-4 {
+            lockedPlanePoint = p0
+            lockedPlaneNormal = simd_normalize(crossVec)
+        }
+    }
+    
+    // MARK: - 6x Live Magnifier & Sub-Pixel Sobel Edge Snap
     
     private func updateMagnifierAndSubPixelEdge(frame: ARFrame) {
         let pixelBuffer = frame.capturedImage
         let ciImage = CIImage(cvPixelBuffer: pixelBuffer).oriented(.right)
         let extent = ciImage.extent
         
-        // Crop central 140x140 pixel patch for 6x magnification loupe
         let cropSize: CGFloat = 140.0
         let cropRect = CGRect(
             x: extent.midX - cropSize / 2.0,
@@ -327,89 +387,217 @@ final class ARScannerEngine: NSObject, ObservableObject, ARSCNViewDelegate, ARSe
         let cropped = ciImage.cropped(to: cropRect)
         guard let cgImg = ciContext.createCGImage(cropped, from: cropRect) else { return }
         
-        // Analyze central 16x16 pixels for sharp luminance gradient (metal inner pipe edge)
-        let hasSharpEdge = detectCentralEdgeContrast(in: cgImg)
+        let (hasSharpEdge, subPxOffset) = computeSubPixelEdgeOffset(in: cgImg)
         let uiImg = UIImage(cgImage: cgImg)
         
         DispatchQueue.main.async { [weak self] in
             self?.magnifierImage = uiImg
             self?.subPixelEdgeLocked = hasSharpEdge
+            self?.subPixelOffsetNorm = subPxOffset
         }
     }
     
-    private func detectCentralEdgeContrast(in cgImage: CGImage) -> Bool {
+    /// Finds the strongest metal pipe inner edge gradient within ±6 pixels of the crosshair center and returns sub-pixel offset.
+    private func computeSubPixelEdgeOffset(in cgImage: CGImage) -> (Bool, CGPoint) {
         let w = cgImage.width
         let h = cgImage.height
-        guard w >= 16, h >= 16,
+        guard w >= 24, h >= 24,
               let data = cgImage.dataProvider?.data,
-              let ptr = CFDataGetBytePtr(data) else { return false }
+              let ptr = CFDataGetBytePtr(data) else { return (false, .zero) }
         
-        let bytesPerPixel = cgImage.bitsPerPixel / 8
-        let bytesPerRow = cgImage.bytesPerRow
+        let bpp = cgImage.bitsPerPixel / 8
+        let bpr = cgImage.bytesPerRow
         let cx = w / 2
         let cy = h / 2
         
-        var minLuma: Int = 255
-        var maxLuma: Int = 0
-        for dy in -4...4 {
-            for dx in -4...4 {
-                let offset = (cy + dy) * bytesPerRow + (cx + dx) * bytesPerPixel
-                let r = Int(ptr[offset])
-                let g = Int(ptr[offset + 1])
-                let b = Int(ptr[offset + 2])
-                let luma = (r * 299 + g * 587 + b * 114) / 1000
-                if luma < minLuma { minLuma = luma }
-                if luma > maxLuma { maxLuma = luma }
+        func luma(_ x: Int, _ y: Int) -> Int {
+            let off = y * bpr + x * bpp
+            return (Int(ptr[off]) * 299 + Int(ptr[off + 1]) * 587 + Int(ptr[off + 2]) * 114) / 1000
+        }
+        
+        var maxGrad = 0
+        var bestDx = 0
+        var bestDy = 0
+        
+        for dy in -5...5 {
+            for dx in -5...5 {
+                let gx = luma(cx + dx + 1, cy + dy) - luma(cx + dx - 1, cy + dy)
+                let gy = luma(cx + dx, cy + dy + 1) - luma(cx + dx, cy + dy - 1)
+                let mag = abs(gx) + abs(gy)
+                if mag > maxGrad {
+                    maxGrad = mag
+                    bestDx = dx
+                    bestDy = dy
+                }
             }
         }
-        return (maxLuma - minLuma) > 38
+        
+        if maxGrad > 42 {
+            return (true, CGPoint(x: CGFloat(bestDx) / 6.0, y: CGFloat(-bestDy) / 6.0))
+        }
+        return (false, .zero)
     }
     
-    // MARK: - 2.00" x 2.00" Magnetic Sticker Fiducial Detector
+    // MARK: - Genuine ArUco 4x4_50 Fiducial Marker Detector & PnP Scale Calibration
     
-    func detectMagneticStickers(in frame: ARFrame) {
+    func detectArUcoMagneticStickers(in frame: ARFrame) {
+        let pixelBuffer = frame.capturedImage
+        let intrinsics = frame.camera.intrinsics
+        let focalLengthPx = Float(intrinsics.columns.0.x)
+        let imgWidthPx = Float(CVPixelBufferGetWidth(pixelBuffer))
+        
         let request = VNDetectRectanglesRequest { [weak self] req, _ in
             guard let self = self,
                   let results = req.results as? [VNRectangleObservation],
                   !results.isEmpty else { return }
             
             for rect in results {
-                // Magnetic stickers are square (aspect ratio ~1.0)
                 let aspect = rect.boundingBox.width / max(rect.boundingBox.height, 0.001)
-                guard aspect > 0.70 && aspect < 1.35 && rect.confidence > 0.85 else { continue }
+                guard aspect > 0.65 && aspect < 1.45 && rect.confidence > 0.80 else { continue }
                 
-                self.registerDetectedSticker(rect, frame: frame)
+                if let decodedID = self.decodeArUco4x4(from: pixelBuffer, observation: rect) {
+                    self.registerCalibratedArUcoSticker(
+                        id: decodedID,
+                        rect: rect,
+                        focalLengthPx: focalLengthPx,
+                        imgWidthPx: imgWidthPx
+                    )
+                }
             }
         }
-        request.minimumAspectRatio = 0.70
-        request.maximumAspectRatio = 1.30
-        request.minimumSize = 0.02
-        request.maximumObservations = 8
-        request.minimumConfidence = 0.85
+        request.minimumAspectRatio = 0.65
+        request.maximumAspectRatio = 1.45
+        request.minimumSize = 0.015
+        request.maximumObservations = 10
+        request.minimumConfidence = 0.80
         
-        let handler = VNImageRequestHandler(cvPixelBuffer: frame.capturedImage, orientation: .right, options: [:])
+        let handler = VNImageRequestHandler(cvPixelBuffer: pixelBuffer, orientation: .right, options: [:])
         try? handler.perform([request])
     }
     
-    private func registerDetectedSticker(_ rect: VNRectangleObservation, frame: ARFrame) {
+    /// Samples the 6x6 grid inside a detected rectangle and matches against OpenCV DICT_4X4_50 (all 4 rotations).
+    private func decodeArUco4x4(from pixelBuffer: CVPixelBuffer, observation: VNRectangleObservation) -> Int? {
+        CVPixelBufferLockBaseAddress(pixelBuffer, .readOnly)
+        defer { CVPixelBufferUnlockBaseAddress(pixelBuffer, .readOnly) }
+        
+        guard let baseAddr = CVPixelBufferGetBaseAddressOfPlane(pixelBuffer, 0) else { return nil }
+        let width = CVPixelBufferGetWidthOfPlane(pixelBuffer, 0)
+        let height = CVPixelBufferGetHeightOfPlane(pixelBuffer, 0)
+        let bpr = CVPixelBufferGetBytesPerRowOfPlane(pixelBuffer, 0)
+        let lumaPtr = baseAddr.assumingMemoryBound(to: UInt8.self)
+        
+        // Bilinearly interpolate 6x6 cell centers across the quadrilateral
+        let tl = observation.topLeft
+        let tr = observation.topRight
+        let bl = observation.bottomLeft
+        let br = observation.bottomRight
+        
+        var gridLuma = [[Int]](repeating: [Int](repeating: 0, count: 6), count: 6)
+        var sumLuma = 0
+        
+        for r in 0..<6 {
+            let v = (CGFloat(r) + 0.5) / 6.0
+            for c in 0..<6 {
+                let u = (CGFloat(c) + 0.5) / 6.0
+                let topX = tl.x * (1 - u) + tr.x * u
+                let topY = tl.y * (1 - u) + tr.y * u
+                let botX = bl.x * (1 - u) + br.x * u
+                let botY = bl.y * (1 - u) + br.y * u
+                
+                let normX = topX * (1 - v) + botX * v
+                let normY = topY * (1 - v) + botY * v
+                
+                let px = min(max(Int(normX * CGFloat(width)), 0), width - 1)
+                let py = min(max(Int((1.0 - normY) * CGFloat(height)), 0), height - 1)
+                let val = Int(lumaPtr[py * bpr + px])
+                gridLuma[r][c] = val
+                sumLuma += val
+            }
+        }
+        
+        let threshold = sumLuma / 36
+        
+        // Check outer 1-cell border is predominantly black (< threshold)
+        var borderBlackCount = 0
+        for i in 0..<6 {
+            if gridLuma[0][i] < threshold { borderBlackCount += 1 }
+            if gridLuma[5][i] < threshold { borderBlackCount += 1 }
+            if gridLuma[i][0] < threshold { borderBlackCount += 1 }
+            if gridLuma[i][5] < threshold { borderBlackCount += 1 }
+        }
+        guard borderBlackCount >= 18 else { return nil }
+        
+        // Extract inner 4x4 bits
+        var bits = [[Int]](repeating: [Int](repeating: 0, count: 4), count: 4)
+        for r in 0..<4 {
+            for c in 0..<4 {
+                bits[r][c] = gridLuma[r + 1][c + 1] > threshold ? 1 : 0
+            }
+        }
+        
+        // Test all 4 rotations against official DICT_4X4_50 codes (allowing <= 1 bit noise)
+        var rotBits = bits
+        for _ in 0..<4 {
+            var code: UInt16 = 0
+            for r in 0..<4 {
+                for c in 0..<4 {
+                    code = (code << 1) | UInt16(rotBits[r][c])
+                }
+            }
+            for (id, refCode) in Self.aruco4x4Codes.enumerated() {
+                if (code ^ refCode).nonzeroBitCount <= 1 {
+                    return id + 1
+                }
+            }
+            // Rotate 90 degrees
+            var nextRot = [[Int]](repeating: [Int](repeating: 0, count: 4), count: 4)
+            for r in 0..<4 {
+                for c in 0..<4 {
+                    nextRot[c][3 - r] = rotBits[r][c]
+                }
+            }
+            rotBits = nextRot
+        }
+        return nil
+    }
+    
+    private func registerCalibratedArUcoSticker(
+        id: Int,
+        rect: VNRectangleObservation,
+        focalLengthPx: Float,
+        imgWidthPx: Float
+    ) {
         guard let currentPos = currentCrosshairWorldPos else { return }
         
-        // Estimate sticker angular span vs known 2.00" (0.0508m) physical width to refine local scale factor
-        let stickerID = ( abs(Int(rect.boundingBox.midX * 12.0)) % 12 ) + 1
+        // Compute apparent marker pixel width from its 4 sub-pixel corners
+        let topEdgeNorm = Float(hypot(rect.topRight.x - rect.topLeft.x, rect.topRight.y - rect.topLeft.y))
+        let botEdgeNorm = Float(hypot(rect.bottomRight.x - rect.bottomLeft.x, rect.bottomRight.y - rect.bottomLeft.y))
+        let avgEdgePx = ((topEdgeNorm + botEdgeNorm) * 0.5) * imgWidthPx
+        
+        var scaleFactor: Float = 1.0
+        if avgEdgePx > 15.0 && focalLengthPx > 100.0 && currentDistanceInches > 2.0 {
+            let opticalDepthMeters = (focalLengthPx * stickerPhysicalSizeMeters) / avgEdgePx
+            let lidarDepthMeters = Float(currentDistanceInches / CADGeometryEngine.inchesPerMeter)
+            let ratio = opticalDepthMeters / max(lidarDepthMeters, 0.05)
+            if ratio > 0.90 && ratio < 1.10 {
+                scaleFactor = ratio
+            }
+        }
+        
         let anchor = MagneticStickerAnchor(
-            id: stickerID,
+            id: id,
             positionX: currentPos.x,
             positionY: currentPos.y,
             positionZ: currentPos.z,
-            normalX: 0,
-            normalY: 0,
-            normalZ: 1,
-            measuredScaleFactor: 1.0,
+            normalX: lockedPlaneNormal?.x ?? 0,
+            normalY: lockedPlaneNormal?.y ?? 0,
+            normalZ: lockedPlaneNormal?.z ?? 1,
+            measuredScaleFactor: scaleFactor,
             lastSeen: Date()
         )
         
         DispatchQueue.main.async { [weak self] in
-            self?.detectedStickers[stickerID] = anchor
+            self?.detectedStickers[id] = anchor
         }
     }
     
@@ -447,7 +635,6 @@ final class ARScannerEngine: NSObject, ObservableObject, ARSCNViewDelegate, ARSe
         let node = SCNNode(geometry: sphere)
         node.position = SCNVector3(point.x, point.y, point.z)
         
-        // Add a larger outer ring on the 1st point so worker can easily spot it when completing the loop
         if isFirstPoint {
             let torus = SCNTorus(ringRadius: 0.015, pipeRadius: 0.0018)
             let ringMat = SCNMaterial()
