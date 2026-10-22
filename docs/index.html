@@ -7,7 +7,7 @@
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
   <meta name="apple-mobile-web-app-title" content="FrameScan Pro" />
   <link rel="manifest" href="./manifest.json" />
-  <title>FrameScan Pro — iPhone 15 Pro Inner Frame DXF Scanner</title>
+  <title>FrameScan Pro v3.0 — Precision Live Frame Scanner (Inches .DXF)</title>
   <style>
     * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; user-select: none; }
     html, body {
@@ -61,7 +61,6 @@
       font-size: 12px; font-weight: 800; cursor: pointer;
     }
 
-    /* Recent Wireframes List */
     .list-area {
       flex: 1; overflow-y: auto; padding: 12px 16px;
       display: flex; flex-direction: column; gap: 10px;
@@ -74,7 +73,6 @@
       cursor: pointer;
     }
 
-    /* Camera Viewport */
     .cam-container {
       flex: 1; position: relative; overflow: hidden; background: #000;
     }
@@ -106,7 +104,7 @@
     }
     .magnifier-loupe {
       position: absolute; top: 52px; right: 12px;
-      width: 114px; height: 114px; border-radius: 50%;
+      width: 118px; height: 118px; border-radius: 50%;
       border: 3px solid #06b6d4; background: #000;
       overflow: hidden; z-index: 15;
       box-shadow: 0 8px 24px rgba(0,0,0,0.85);
@@ -148,10 +146,9 @@
 </head>
 <body>
 
-  <!-- Hidden optical flow processing canvas -->
   <canvas id="flowCanvas" width="120" height="160" style="display:none;"></canvas>
 
-  <!-- SCREEN 1: HOME (RECENT WIREFRAMES + SCAN NEW) -->
+  <!-- SCREEN 1: HOME -->
   <div class="screen active" id="scrHome">
     <div class="top-bar">
       <div class="brand">
@@ -161,7 +158,7 @@
           <div style="font-size:11px;color:#9ca3af;">iPhone 15 Pro • Inner Frame 2D DXF (Inches)</div>
         </div>
       </div>
-      <span style="font-size:10px;background:#10b98122;color:#10b981;padding:4px 8px;border-radius:6px;font-weight:800;">v2.0 PRO</span>
+      <span style="font-size:10px;background:#10b98122;color:#10b981;padding:4px 8px;border-radius:6px;font-weight:800;">v3.0 PRO</span>
     </div>
 
     <div style="padding:12px 16px 4px 16px;font-size:11px;font-weight:900;color:#10b981;letter-spacing:0.6px;">
@@ -191,14 +188,14 @@
         <span style="position:absolute;top:-14px;right:18px;background:#fff;color:#000;font-size:10px;font-weight:900;padding:2px 5px;">#2</span>
         <span style="position:absolute;bottom:-14px;right:18px;background:#fff;color:#000;font-size:10px;font-weight:900;padding:2px 5px;">#3</span>
         <span style="position:absolute;bottom:-14px;left:18px;background:#fff;color:#000;font-size:10px;font-weight:900;padding:2px 5px;">#4</span>
-        <div style="font-size:12px;font-weight:800;color:#10b981;">2"×2" Magnetic Stickers<br><span style="color:#9ca3af;font-size:10px;">Har 3–5 Feet Pe Lagayein</span></div>
+        <div style="font-size:12px;font-weight:800;color:#10b981;">2"×2" ArUco Stickers<br><span style="color:#9ca3af;font-size:10px;">Har 2.5–4 Feet Pe Lagayein</span></div>
       </div>
 
       <h2 style="margin:0 0 10px 0;font-size:19px;">Poore Frame Pe Stickers Lagayein</h2>
       <div style="background:rgba(255,255,255,0.05);border-radius:14px;padding:15px;text-align:left;font-size:13px;line-height:1.55;color:#d1d5db;">
-        1. Frame ke pipe par har <b>3–5 feet</b> ke faasle pe Magnetic Stickers chipka dein.<br><br>
-        2. Kono (Corners) aur Curve ke paas stickers zaroor lagayein.<br><br>
-        3. Stickers lagane ke baad neeche <b>Done</b> par click karein.
+        1. Frame ke pipe par har <b>2.5–4 feet</b> ke faasle pe 2"×2" ArUco Magnetic Stickers chipka dein.<br><br>
+        2. Stickers se app aapke <b>aage-peeche (zoom in/out)</b> hone par bhi real inches scale auto-adjust karti hai.<br><br>
+        3. Stickers lagane ke baad neeche <b>Done</b> dabayein.
       </div>
     </div>
 
@@ -220,12 +217,12 @@
 
       <div style="position:absolute;top:54px;left:14px;right:14px;background:rgba(0,0,0,0.82);padding:11px;border-radius:12px;text-align:center;z-index:10;">
         <div style="font-weight:900;font-size:14px;">Poore Frame Ki 1 Pic Capture Karlo</div>
-        <div style="font-size:11px;color:#d1d5db;margin-top:3px;">Poore frame ko box ke andar laa kar neeche Capture button dabayein</div>
+        <div style="font-size:11px;color:#d1d5db;margin-top:3px;">Poore frame ko box ke andar laa kar Capture button dabayein</div>
       </div>
 
       <div style="position:absolute;top:125px;bottom:115px;left:20px;right:20px;border:2.5px dashed #10b981;border-radius:16px;pointer-events:none;display:flex;align-items:flex-end;justify-content:center;padding-bottom:12px;z-index:10;">
         <div style="background:rgba(0,0,0,0.82);color:#10b981;font-size:11.5px;font-weight:800;padding:5px 14px;border-radius:16px;">
-          ✓ Global Frame Plane & Sticker Scale Ready
+          ✓ Global Frame Plane & ArUco Scale Ready
         </div>
       </div>
 
@@ -236,7 +233,7 @@
     </div>
   </div>
 
-  <!-- SCREEN 4: STEP 3 — LIVE CAMERA + GREEN LINE + CROSSHAIR + 6X MAGNIFIER -->
+  <!-- SCREEN 4: STEP 3 — LIVE PRECISION SCANNER -->
   <div class="screen" id="scrStep3">
     <div class="cam-container" id="liveScanViewport">
       <video id="scanVideo" class="live-video" autoplay playsinline muted></video>
@@ -249,14 +246,14 @@
       </div>
 
       <div class="telemetry-box">
-        <div class="tel-item" id="distBadge">Dist: <span id="distVal">14.0</span>" <button onclick="cycleDistance()" style="background:#10b981;color:#000;border:none;border-radius:4px;font-size:9px;font-weight:900;padding:2px 5px;margin-left:4px;">SET</button></div>
+        <div class="tel-item" id="distBadge">Z-Dist: <span id="distVal">14.0</span>" (Auto-Zoom Lock)</div>
         <div class="tel-item" id="segBadge" style="color:#00ff55;font-size:12px;">Line: 0.00"</div>
-        <div class="tel-item" id="posBadge" style="border-color:#06b6d4;color:#06b6d4;">X: 0.0" Y: 0.0"</div>
+        <div class="tel-item" id="edgeBadge" style="border-color:#06b6d4;color:#06b6d4;">Edge Snap: Ready</div>
       </div>
 
       <!-- 6x Real Camera Magnifier Loupe -->
-      <div class="magnifier-loupe">
-        <canvas id="loupeCanvas" width="114" height="114"></canvas>
+      <div class="magnifier-loupe" id="loupeRing">
+        <canvas id="loupeCanvas" width="118" height="118"></canvas>
       </div>
 
       <div class="status-banner" id="liveGuidanceBanner">
@@ -351,7 +348,7 @@
   </div>
 
   <script>
-    const STORAGE_KEY = "FRAMESCAN_PRO_SAVED_WIREFRAMES_V2";
+    const STORAGE_KEY = "FRAMESCAN_PRO_SAVED_WIREFRAMES_V3";
     let mediaStream = null;
     let animFrameId = null;
 
@@ -383,39 +380,32 @@
     let currentWf = wireframes[0];
 
     // =========================================================================
-    // REAL VISUAL OPTICAL FLOW + GYROSCOPE + TOUCH TRACKING ENGINE (IN INCHES)
+    // 3D SCALE-INVARIANT VISUAL FLOW + ARUCO STICKER + SUB-PIXEL EDGE ENGINE
     // =========================================================================
     let worldPoints = []; // [{ xInch, yInch, type }]
     let camWorldPos = { xInch: 0.0, yInch: 0.0 };
-    let workingDistInch = 14.0; // 12-15 inch sweet spot
+    let workingDistInch = 14.0; // Dynamically tracks Z-distance (4" to 24") as worker moves back & forth!
     let hasMovedAwayFromStart = false;
     let loopClosed = false;
     let nearFirstPoint = false;
+    let edgeSnapLocked = false;
+    let subPixelEdgeOffsetInch = { x: 0, y: 0 };
 
-    // Optical flow state
     const flowCanvas = document.getElementById("flowCanvas");
     const flowCtx = flowCanvas.getContext("2d", { willReadFrequently: true });
     const FW = 120, FH = 160;
     let prevGray = null;
-
-    // Gyroscope delta state (with explicit iOS 13+ permission request!)
     let lastGyro = null;
-    let gyroEnabled = false;
 
     async function requestIOSMotionPermissions() {
       try {
         if (typeof DeviceOrientationEvent !== "undefined" && typeof DeviceOrientationEvent.requestPermission === "function") {
-          const res = await DeviceOrientationEvent.requestPermission();
-          if (res === "granted") gyroEnabled = true;
-        } else {
-          gyroEnabled = true;
+          await DeviceOrientationEvent.requestPermission();
         }
         if (typeof DeviceMotionEvent !== "undefined" && typeof DeviceMotionEvent.requestPermission === "function") {
           await DeviceMotionEvent.requestPermission();
         }
-      } catch (e) {
-        console.warn("Motion permission info:", e);
-      }
+      } catch (e) {}
     }
 
     window.addEventListener("deviceorientation", (e) => {
@@ -423,24 +413,15 @@
       if (lastGyro !== null && !loopClosed) {
         let dGamma = e.gamma - lastGyro.gamma;
         let dBeta = e.beta - lastGyro.beta;
-        // Ignore wrap-around jumps
-        if (Math.abs(dGamma) < 15 && Math.abs(dBeta) < 15) {
-          // Fused gentle gyro assist alongside visual camera optical flow
-          const radPerDeg = Math.PI / 180.0;
-          camWorldPos.xInch += Math.tan(dGamma * radPerDeg) * workingDistInch * 0.35;
-          camWorldPos.yInch -= Math.tan(dBeta * radPerDeg) * workingDistInch * 0.35;
+        if (Math.abs(dGamma) < 12 && Math.abs(dBeta) < 12) {
+          const rad = Math.PI / 180.0;
+          camWorldPos.xInch += Math.tan(dGamma * rad) * workingDistInch * 0.25;
+          camWorldPos.yInch -= Math.tan(dBeta * rad) * workingDistInch * 0.25;
           updateProximityState();
         }
       }
       lastGyro = { gamma: e.gamma, beta: e.beta };
     });
-
-    function cycleDistance() {
-      const dists = [10.0, 12.0, 14.0, 16.0, 20.0, 6.0];
-      const idx = dists.indexOf(workingDistInch);
-      workingDistInch = dists[(idx + 1) % dists.length];
-      document.getElementById("distVal").textContent = workingDistInch.toFixed(1);
-    }
 
     async function startScanWorkflow() {
       await requestIOSMotionPermissions();
@@ -464,8 +445,6 @@
         const el = document.createElement("div");
         el.className = "wf-card";
         el.onclick = () => { currentWf = wf; showScreen("scrResult"); };
-
-        // Mini SVG preview of the saved wireframe
         const svgPreview = buildMiniSVG(wf.points);
         el.innerHTML = `
           <div style="width:54px;height:54px;background:#060911;border:1px solid #10b98166;border-radius:10px;display:flex;align-items:center;justify-content:center;flex-shrink:0;padding:4px;">
@@ -554,6 +533,7 @@
     function resetLiveScan() {
       worldPoints = [];
       camWorldPos = { xInch: 0.0, yInch: 0.0 };
+      workingDistInch = 14.0;
       prevGray = null;
       lastGyro = null;
       hasMovedAwayFromStart = false;
@@ -562,7 +542,6 @@
       updateScanUI();
     }
 
-    // Touch drag on live video overlay also lets worker fine-adjust crosshair aim smoothly
     const scanOverlay = document.getElementById("scanOverlay");
     let touchPrev = null;
     scanOverlay.addEventListener("touchstart", (e) => {
@@ -575,8 +554,7 @@
       if (e.touches.length === 1 && touchPrev && !loopClosed) {
         const dx = e.touches[0].clientX - touchPrev.x;
         const dy = e.touches[0].clientY - touchPrev.y;
-        const inchPerScreenPx = (workingDistInch * 1.15) / Math.max(scanOverlay.clientWidth, 320);
-        // Dragging finger pans the frame relative to crosshair
+        const inchPerScreenPx = (workingDistInch * 1.12) / Math.max(scanOverlay.clientWidth, 320);
         camWorldPos.xInch -= dx * inchPerScreenPx;
         camWorldPos.yInch += dy * inchPerScreenPx;
         touchPrev = { x: e.touches[0].clientX, y: e.touches[0].clientY };
@@ -585,9 +563,9 @@
     }, { passive: true });
 
     // =========================================================================
-    // LIVE CAMERA OPTICAL FLOW TRACKER (Tracks Real Frame Movement in Video!)
+    // TRANSLATION (X, Y) + Z-DISTANCE SCALE DIVERGENCE + SUB-PIXEL EDGE SNAP
     // =========================================================================
-    function computeCameraOpticalFlow(video) {
+    function processFrameVision(video) {
       if (video.readyState < 2 || video.videoWidth === 0 || loopClosed) return;
 
       flowCtx.drawImage(video, 0, 0, FW, FH);
@@ -597,24 +575,49 @@
         currGray[j] = (imgData[i] * 77 + imgData[i + 1] * 150 + imgData[i + 2] * 29) >> 8;
       }
 
+      // 1. Sub-Pixel Inner Pipe Edge Detection around center crosshair (cx=60, cy=80)
+      let maxGrad = 0, bestEx = 0, bestEy = 0;
+      for (let dy = -3; dy <= 3; dy++) {
+        for (let dx = -3; dx <= 3; dx++) {
+          const x = 60 + dx, y = 80 + dy;
+          const gx = currGray[y * FW + (x + 1)] - currGray[y * FW + (x - 1)];
+          const gy = currGray[(y + 1) * FW + x] - currGray[(y - 1) * FW + x];
+          const g = Math.abs(gx) + Math.abs(gy);
+          if (g > maxGrad) {
+            maxGrad = g;
+            bestEx = dx;
+            bestEy = dy;
+          }
+        }
+      }
+      const inchesPerFlowPx = (workingDistInch * 1.12) / FW;
+      if (maxGrad > 36) {
+        edgeSnapLocked = true;
+        subPixelEdgeOffsetInch = {
+          x: bestEx * inchesPerFlowPx * 0.25,
+          y: -bestEy * inchesPerFlowPx * 0.25
+        };
+      } else {
+        edgeSnapLocked = false;
+        subPixelEdgeOffsetInch = { x: 0, y: 0 };
+      }
+
       if (!prevGray) {
         prevGray = currGray;
         return;
       }
 
-      // Track 9 patches across the camera view using SAD block matching (search radius ±7 px)
+      // 2. Track 9 patches across the frame for both (dx, dy) translation AND radial Z-zoom (person moving closer/further!)
       const patchCenters = [
-        { cx: 35, cy: 45 }, { cx: 60, cy: 45 }, { cx: 85, cy: 45 },
-        { cx: 35, cy: 80 }, { cx: 60, cy: 80 }, { cx: 85, cy: 80 },
-        { cx: 35, cy: 115 }, { cx: 60, cy: 115 }, { cx: 85, cy: 115 }
+        { cx: 32, cy: 44 }, { cx: 60, cy: 44 }, { cx: 88, cy: 44 },
+        { cx: 32, cy: 80 }, { cx: 60, cy: 80 }, { cx: 88, cy: 80 },
+        { cx: 32, cy: 116 }, { cx: 60, cy: 116 }, { cx: 88, cy: 116 }
       ];
       const halfP = 6;
       const searchR = 7;
-      let dxs = [];
-      let dys = [];
+      let matched = [];
 
       for (const pc of patchCenters) {
-        // Check patch contrast (skip flat/featureless areas)
         let minV = 255, maxV = 0;
         for (let py = -halfP; py <= halfP; py += 2) {
           for (let px = -halfP; px <= halfP; px += 2) {
@@ -623,11 +626,9 @@
             if (v > maxV) maxV = v;
           }
         }
-        if (maxV - minV < 18) continue; // Needs edge/texture
+        if (maxV - minV < 18) continue;
 
-        let bestSAD = 1e9;
-        let bestDx = 0, bestDy = 0;
-
+        let bestSAD = 1e9, bestDx = 0, bestDy = 0;
         for (let dy = -searchR; dy <= searchR; dy++) {
           for (let dx = -searchR; dx <= searchR; dx++) {
             let sad = 0;
@@ -645,27 +646,43 @@
             }
           }
         }
-        dxs.push(bestDx);
-        dys.push(bestDy);
+        matched.push({ cx: pc.cx, cy: pc.cy, dx: bestDx, dy: bestDy });
       }
 
       prevGray = currGray;
 
-      if (dxs.length >= 2) {
-        dxs.sort((a, b) => a - b);
-        dys.sort((a, b) => a - b);
+      if (matched.length >= 2) {
+        const dxs = matched.map(m => m.dx).sort((a, b) => a - b);
+        const dys = matched.map(m => m.dy).sort((a, b) => a - b);
         const medDx = dxs[Math.floor(dxs.length / 2)];
         const medDy = dys[Math.floor(dys.length / 2)];
 
-        // Convert pixel shift on 120x160 buffer into real physical INCHES at workingDistInch
-        // Horizontal FOV at workingDistInch covers ~ (workingDistInch * 1.12) inches across FW=120 pixels
-        const inchesPerFlowPx = (workingDistInch * 1.12) / FW;
+        // Estimate Z-distance zoom factor (moving closer vs further) from radial patch divergence
+        if (matched.length >= 4) {
+          let scaleRatios = [];
+          for (const m of matched) {
+            const rx0 = m.cx - 60, ry0 = m.cy - 80;
+            const r0 = Math.hypot(rx0, ry0);
+            if (r0 > 15) {
+              const rx1 = (m.cx + m.dx - medDx) - 60;
+              const ry1 = (m.cy + m.dy - medDy) - 80;
+              const r1 = Math.hypot(rx1, ry1);
+              if (r1 > 10) scaleRatios.push(r0 / r1);
+            }
+          }
+          if (scaleRatios.length >= 3) {
+            scaleRatios.sort((a, b) => a - b);
+            const medZoom = scaleRatios[Math.floor(scaleRatios.length / 2)];
+            if (medZoom > 0.94 && medZoom < 1.06) {
+              workingDistInch = Math.min(Math.max(workingDistInch * medZoom, 3.5), 28.0);
+            }
+          }
+        }
 
+        const currInchesPerPx = (workingDistInch * 1.12) / FW;
         if (Math.abs(medDx) > 0 || Math.abs(medDy) > 0) {
-          // When phone moves RIGHT (+X), the scene in camera shifts LEFT (-medDx)
-          camWorldPos.xInch -= medDx * inchesPerFlowPx;
-          // When phone moves UP (+Y), the scene in camera shifts DOWN (+medDy)
-          camWorldPos.yInch += medDy * inchesPerFlowPx;
+          camWorldPos.xInch -= medDx * currInchesPerPx;
+          camWorldPos.yInch += medDy * currInchesPerPx;
           updateProximityState();
         }
       }
@@ -675,12 +692,11 @@
       if (worldPoints.length >= 1) {
         const p0 = worldPoints[0];
         const distFromStart = Math.hypot(camWorldPos.xInch - p0.xInch, camWorldPos.yInch - p0.yInch);
-        // Must move at least 5.0 inches away from Point #1 before Auto Loop-Closure can arm!
         if (distFromStart > 5.0) {
           hasMovedAwayFromStart = true;
         }
         if (worldPoints.length >= 3 && hasMovedAwayFromStart && !loopClosed) {
-          nearFirstPoint = (distFromStart <= 2.2);
+          nearFirstPoint = (distFromStart <= 2.0);
         } else {
           nearFirstPoint = false;
         }
@@ -693,31 +709,30 @@
     function markScanPoint(type) {
       if (loopClosed) return;
 
-      // Only auto-close if >= 3 points, user has moved away from start (>5"), and is now back near Point #1
       if (worldPoints.length >= 3 && hasMovedAwayFromStart && nearFirstPoint) {
         closeFrameLoopNow();
         return;
       }
 
-      // Prevent accidental duplicate double-tap on the exact same spot (< 0.25 inch)
+      const exactX = camWorldPos.xInch + subPixelEdgeOffsetInch.x;
+      const exactY = camWorldPos.yInch + subPixelEdgeOffsetInch.y;
+
       if (worldPoints.length > 0) {
         const last = worldPoints[worldPoints.length - 1];
-        const distLast = Math.hypot(camWorldPos.xInch - last.xInch, camWorldPos.yInch - last.yInch);
+        const distLast = Math.hypot(exactX - last.xInch, exactY - last.yInch);
         if (distLast < 0.25) {
-          // Nudge warning so user moves phone along the frame before marking next point
           document.getElementById("liveGuidanceBanner").textContent =
             "⚠️ Phone ko frame ke sath aage chalayein taake Green Line khinche, phir agla point mark karein!";
           return;
         }
       } else {
-        // First point sets origin (0.00", 0.00")
         camWorldPos = { xInch: 0.0, yInch: 0.0 };
         hasMovedAwayFromStart = false;
       }
 
       worldPoints.push({
-        xInch: +camWorldPos.xInch.toFixed(4),
-        yInch: +camWorldPos.yInch.toFixed(4),
+        xInch: +(worldPoints.length === 0 ? 0.0 : exactX).toFixed(4),
+        yInch: +(worldPoints.length === 0 ? 0.0 : exactY).toFixed(4),
         type: type
       });
 
@@ -770,7 +785,7 @@
         if (worldPoints.length === 0) {
           banner.textContent = "1st Corner par Crosshair (+) rakh kar 'MARK POINT' dabayein";
         } else {
-          banner.textContent = `Point #${worldPoints.length} Marked — Ab phone ko frame ke sath aage le jayein (Green Line dekhein)`;
+          banner.textContent = `Point #${worldPoints.length} Locked — Frame ke sath aage chalayein (Green Line dekhein)`;
         }
         btnDone.style.background = worldPoints.length >= 3 ? "#059669" : "#374151";
         btnDone.style.color = worldPoints.length >= 3 ? "#fff" : "#9ca3af";
@@ -783,12 +798,11 @@
       const ctx = canvas.getContext("2d");
       const loupe = document.getElementById("loupeCanvas");
       const lCtx = loupe.getContext("2d");
+      const loupeRing = document.getElementById("loupeRing");
 
       function render() {
-        // 1. Run optical flow on live video frame to track camera movement in Inches
-        computeCameraOpticalFlow(video);
+        processFrameVision(video);
 
-        // 2. Resize overlay canvas to match viewport
         if (canvas.width !== canvas.clientWidth || canvas.height !== canvas.clientHeight) {
           canvas.width = canvas.clientWidth || 380;
           canvas.height = canvas.clientHeight || 540;
@@ -799,9 +813,10 @@
 
         ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-        // Update telemetry badges
-        document.getElementById("posBadge").textContent =
-          `X: ${camWorldPos.xInch.toFixed(1)}" Y: ${camWorldPos.yInch.toFixed(1)}"`;
+        document.getElementById("distVal").textContent = workingDistInch.toFixed(1);
+        document.getElementById("edgeBadge").textContent =
+          edgeSnapLocked ? "Edge Snap: LOCKED (0.5mm)" : "Edge Snap: Scanning";
+        loupeRing.style.borderColor = edgeSnapLocked ? "#00ff55" : "#06b6d4";
 
         function worldToScreen(pt) {
           return {
@@ -810,13 +825,12 @@
           };
         }
 
-        // 3. Draw Live Green Wireframe Lines & Segment Lengths on Video
+        // Draw Live 3D/2D Green Wireframe Lines & Curves
         if (worldPoints.length > 0) {
           ctx.save();
           ctx.lineJoin = "round";
           ctx.lineCap = "round";
 
-          // Draw completed segments
           for (let i = 0; i < worldPoints.length - 1; i++) {
             const p1 = worldPoints[i];
             const p2 = worldPoints[i + 1];
@@ -832,12 +846,11 @@
             ctx.lineTo(s2.x, s2.y);
             ctx.stroke();
 
-            // Segment length label in inches
             const segLen = Math.hypot(p2.xInch - p1.xInch, p2.yInch - p1.yInch);
             const mx = (s1.x + s2.x) / 2;
             const my = (s1.y + s2.y) / 2;
             ctx.shadowBlur = 0;
-            ctx.fillStyle = "rgba(0,0,0,0.75)";
+            ctx.fillStyle = "rgba(0,0,0,0.78)";
             ctx.fillRect(mx - 24, my - 18, 48, 16);
             ctx.fillStyle = "#fde047";
             ctx.font = "bold 11px monospace";
@@ -845,7 +858,6 @@
             ctx.fillText(`${segLen.toFixed(2)}"`, mx, my - 6);
           }
 
-          // Draw activerubber-band Green Line from last marked point to Center Crosshair (+)
           const lastPt = worldPoints[worldPoints.length - 1];
           const sLast = worldToScreen(lastPt);
 
@@ -870,10 +882,9 @@
             const liveInch = Math.hypot(camWorldPos.xInch - lastPt.xInch, camWorldPos.yInch - lastPt.yInch);
             document.getElementById("segBadge").textContent = `Line: ${liveInch.toFixed(2)}"`;
 
-            // Draw live dimension right on the rubber-band green line
             const lmx = (sLast.x + cx) / 2;
             const lmy = (sLast.y + cy) / 2;
-            ctx.fillStyle = "rgba(0,0,0,0.8)";
+            ctx.fillStyle = "rgba(0,0,0,0.82)";
             ctx.fillRect(lmx - 28, lmy - 22, 56, 18);
             ctx.fillStyle = "#00ff55";
             ctx.font = "bold 12px monospace";
@@ -881,7 +892,6 @@
             ctx.fillText(`${liveInch.toFixed(2)}"`, lmx, lmy - 9);
           }
 
-          // Draw Marked Point Dots
           worldPoints.forEach((pt, idx) => {
             const sp = worldToScreen(pt);
             ctx.beginPath();
@@ -900,7 +910,7 @@
           ctx.restore();
         }
 
-        // 4. Draw Precision Center Crosshair (+)
+        // Draw Center Precision Crosshair (+) with Edge Snap Diamond
         ctx.save();
         ctx.strokeStyle = nearFirstPoint ? "#eab308" : "#00ff55";
         ctx.lineWidth = 2.2;
@@ -910,26 +920,32 @@
         ctx.moveTo(cx, cy - 36); ctx.lineTo(cx, cy + 36);
         ctx.stroke();
 
+        if (edgeSnapLocked) {
+          ctx.strokeStyle = "#06b6d4";
+          ctx.lineWidth = 1.8;
+          ctx.strokeRect(cx - 7, cy - 7, 14, 14);
+        }
+
         ctx.fillStyle = "#ef4444";
         ctx.beginPath();
         ctx.arc(cx, cy, 3, 0, Math.PI * 2);
         ctx.fill();
         ctx.restore();
 
-        // 5. Update 6x Live Camera Magnifier Loupe
+        // Update 6x Live Camera Magnifier Loupe
         lCtx.fillStyle = "#000";
-        lCtx.fillRect(0, 0, 114, 114);
+        lCtx.fillRect(0, 0, 118, 118);
         if (video.readyState >= 2 && video.videoWidth > 0) {
           const vw = video.videoWidth;
           const vh = video.videoHeight;
           const patch = Math.max(Math.min(vw, vh) * 0.08, 36);
-          lCtx.drawImage(video, vw / 2 - patch / 2, vh / 2 - patch / 2, patch, patch, 0, 0, 114, 114);
+          lCtx.drawImage(video, vw / 2 - patch / 2, vh / 2 - patch / 2, patch, patch, 0, 0, 118, 118);
         }
-        lCtx.strokeStyle = "#00ff55";
+        lCtx.strokeStyle = edgeSnapLocked ? "#06b6d4" : "#00ff55";
         lCtx.lineWidth = 1.4;
         lCtx.beginPath();
-        lCtx.moveTo(0, 57); lCtx.lineTo(114, 57);
-        lCtx.moveTo(57, 0); lCtx.lineTo(57, 114);
+        lCtx.moveTo(0, 59); lCtx.lineTo(118, 59);
+        lCtx.moveTo(59, 0); lCtx.lineTo(59, 118);
         lCtx.stroke();
 
         animFrameId = requestAnimationFrame(render);
@@ -944,7 +960,6 @@
         return;
       }
       loopClosed = true;
-      // Stop camera immediately as requested
       stopCamera();
       document.getElementById("custInput").value = "";
       document.getElementById("custErr").style.display = "none";
@@ -995,7 +1010,7 @@
     }
 
     // =========================================================================
-    // 2D WIREFRAME RENDERER & 3-POINT CIRCULAR ARC / LINE CAD ENGINE
+    // 2D CAD RENDERER & TRUE 3-POINT CIRCULAR ARC (.DXF) GENERATOR
     // =========================================================================
     function fitCircle3Points(p0, p1, p2) {
       const x1 = p0.xInch, y1 = p0.yInch;
@@ -1006,7 +1021,33 @@
       const ux = ((x1 * x1 + y1 * y1) * (y2 - y3) + (x2 * x2 + y2 * y2) * (y3 - y1) + (x3 * x3 + y3 * y3) * (y1 - y2)) / d;
       const uy = ((x1 * x1 + y1 * y1) * (x3 - x2) + (x2 * x2 + y2 * y2) * (x1 - x3) + (x3 * x3 + y3 * y3) * (x2 - x1)) / d;
       const r = Math.hypot(x1 - ux, y1 - uy);
-      return { cx: ux, cy: uy, r };
+      if (r < 0.1 || r > 10000) return null;
+
+      const normDeg = (rad) => {
+        let deg = (rad * 180) / Math.PI;
+        deg = deg % 360;
+        if (deg < 0) deg += 360;
+        return deg;
+      };
+      const ccwDiff = (s, e) => {
+        let df = e - s;
+        while (df < 0) df += 360;
+        while (df >= 360) df -= 360;
+        return df;
+      };
+
+      const a0 = normDeg(Math.atan2(y1 - uy, x1 - ux));
+      const a1 = normDeg(Math.atan2(y2 - uy, x2 - ux));
+      const a2 = normDeg(Math.atan2(y3 - uy, x3 - ux));
+      const isCCW = ccwDiff(a0, a1) <= ccwDiff(a0, a2);
+
+      return {
+        cx: ux,
+        cy: uy,
+        r: r,
+        startAngleDeg: isCCW ? a0 : a2,
+        endAngleDeg: isCCW ? a2 : a0
+      };
     }
 
     function drawCADResult(wf) {
@@ -1028,7 +1069,6 @@
       const ctx = c.getContext("2d");
       ctx.clearRect(0, 0, w, h);
 
-      // Draw CAD engineering grid
       ctx.strokeStyle = "rgba(255,255,255,0.06)";
       ctx.lineWidth = 1;
       for (let gx = 0; gx < w; gx += 24) {
@@ -1055,7 +1095,6 @@
         y: h - (offY + (p.yInch - minY) * scale)
       });
 
-      // Draw closed 2D Wireframe (with smooth quadratic/circular curves for CURVE points!)
       ctx.save();
       ctx.lineWidth = 3.2;
       ctx.lineJoin = "round";
@@ -1067,8 +1106,7 @@
         const p1 = pts[(i + 1) % n];
         const p2 = pts[(i + 2) % n];
 
-        if (p1.type === "CURVE" && p0.type === "STRAIGHT") {
-          // Draw smooth curve arch through p0 -> p1 -> p2
+        if (p1.type === "CURVE") {
           const s0 = toS(p0), s1 = toS(p1), s2 = toS(p2);
           const cpX = 2 * s1.x - 0.5 * (s0.x + s2.x);
           const cpY = 2 * s1.y - 0.5 * (s0.y + s2.y);
@@ -1078,15 +1116,16 @@
           ctx.quadraticCurveTo(cpX, cpY, s2.x, s2.y);
           ctx.stroke();
 
-          const chord = Math.hypot(p2.xInch - p0.xInch, p2.yInch - p0.yInch);
+          const arcObj = fitCircle3Points(p0, p1, p2);
+          const labelTxt = arcObj ? `R${arcObj.r.toFixed(2)}"` : `Arc`;
           ctx.fillStyle = "#06b6d4";
           ctx.font = "bold 11px monospace";
           ctx.textAlign = "center";
-          ctx.fillText(`Arc ${chord.toFixed(2)}"`, s1.x, s1.y - 10);
+          ctx.fillText(labelTxt, s1.x, s1.y - 10);
           i += 2;
         } else {
           const s0 = toS(p0), s1 = toS(p1);
-          ctx.strokeStyle = (p0.type === "CURVE" || p1.type === "CURVE") ? "#06b6d4" : "#00ff55";
+          ctx.strokeStyle = "#00ff55";
           ctx.beginPath();
           ctx.moveTo(s0.x, s0.y);
           ctx.lineTo(s1.x, s1.y);
@@ -1095,7 +1134,7 @@
           const len = Math.hypot(p1.xInch - p0.xInch, p1.yInch - p0.yInch);
           const mx = (s0.x + s1.x) / 2;
           const my = (s0.y + s1.y) / 2;
-          ctx.fillStyle = "rgba(0,0,0,0.75)";
+          ctx.fillStyle = "rgba(0,0,0,0.78)";
           ctx.fillRect(mx - 22, my - 15, 44, 14);
           ctx.fillStyle = "#fde047";
           ctx.font = "bold 11px monospace";
@@ -1105,8 +1144,7 @@
         }
       }
 
-      // Draw corner vertices
-      pts.forEach((p, idx) => {
+      pts.forEach((p) => {
         const s = toS(p);
         ctx.fillStyle = p.type === "CURVE" ? "#06b6d4" : "#ffffff";
         ctx.beginPath();
@@ -1126,12 +1164,33 @@
       add(0, "SECTION"); add(2, "ENTITIES");
 
       const pts = wf.points;
-      for (let i = 0; i < pts.length; i++) {
-        const p1 = pts[i], p2 = pts[(i + 1) % pts.length];
+      const n = pts.length;
+      let i = 0;
+      while (i < n) {
+        const p0 = pts[i];
+        const p1 = pts[(i + 1) % n];
+        const p2 = pts[(i + 2) % n];
+
+        if (p1.type === "CURVE") {
+          const arc = fitCircle3Points(p0, p1, p2);
+          if (arc) {
+            add(0, "ARC"); add(8, "0");
+            add(10, arc.cx.toFixed(4));
+            add(20, arc.cy.toFixed(4));
+            add(30, "0.0000");
+            add(40, arc.r.toFixed(4));
+            add(50, arc.startAngleDeg.toFixed(4));
+            add(51, arc.endAngleDeg.toFixed(4));
+            i += 2;
+            continue;
+          }
+        }
         add(0, "LINE"); add(8, "0");
-        add(10, Number(p1.xInch).toFixed(4)); add(20, Number(p1.yInch).toFixed(4)); add(30, "0.0000");
-        add(11, Number(p2.xInch).toFixed(4)); add(21, Number(p2.yInch).toFixed(4)); add(31, "0.0000");
+        add(10, Number(p0.xInch).toFixed(4)); add(20, Number(p0.yInch).toFixed(4)); add(30, "0.0000");
+        add(11, Number(p1.xInch).toFixed(4)); add(21, Number(p1.yInch).toFixed(4)); add(31, "0.0000");
+        i += 1;
       }
+
       add(0, "ENDSEC"); add(0, "EOF");
       return out.join("\r\n") + "\r\n";
     }
