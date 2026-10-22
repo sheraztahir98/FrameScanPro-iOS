@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <title>FrameScan Pro — Printable 2.00" × 2.00" Magnetic Stickers (A4 1:1 Scale)</title>
+  <title>FrameScan Pro — Official ArUco 4x4_50 Magnetic Stickers (Exact 2.00" × 2.00" A4)</title>
   <style>
     @page {
       size: A4 portrait;
@@ -58,7 +58,7 @@
       width: 194mm;
       margin: 0 auto;
       background: #ffffff;
-      padding: 6mm;
+      padding: 5mm;
       border-radius: 4px;
       box-shadow: 0 10px 30px rgba(0,0,0,0.5);
     }
@@ -71,17 +71,16 @@
       margin-bottom: 4mm;
     }
     .sheet-header h1 {
-      font-size: 14pt;
+      font-size: 13.5pt;
       margin: 0;
       font-weight: 900;
-      letter-spacing: 0.5px;
+      letter-spacing: 0.4px;
     }
     .sheet-header .sub {
-      font-size: 8.5pt;
+      font-size: 8pt;
       color: #333;
       margin-top: 2px;
     }
-    /* Exact 2.00 inch calibration ruler */
     .ruler-box {
       display: flex;
       flex-direction: column;
@@ -89,7 +88,7 @@
     }
     .ruler-bar {
       width: 2.00in;
-      height: 5mm;
+      height: 4.5mm;
       border: 1.5px solid #000;
       background: repeating-linear-gradient(
         90deg,
@@ -104,18 +103,16 @@
       font-weight: 800;
       margin-top: 1mm;
     }
-    /* Grid of 12 Stickers (3 columns x 4 rows) */
     .sticker-grid {
       display: grid;
       grid-template-columns: repeat(3, 1fr);
-      gap: 4.5mm;
+      gap: 4mm;
       justify-items: center;
     }
-    /* Outer cut boundary (58mm x 63mm) */
     .sticker-cut-card {
       width: 58mm;
       height: 62mm;
-      border: 1px dashed #777;
+      border: 1px dashed #666;
       display: flex;
       flex-direction: column;
       align-items: center;
@@ -123,22 +120,17 @@
       padding: 2mm;
       background: #fff;
     }
-    /* Exact 2.00 inch x 2.00 inch (50.8mm x 50.8mm) Active Vision Square */
-    .fiducial-square {
+    /* Standard ArUco 6x6 total grid (1-cell solid black border + 4x4 inner data bits) = Exact 2.00" x 2.00" (50.8mm) */
+    .aruco-marker {
       width: 2.00in;
       height: 2.00in;
-      border: 3.5mm solid #000;
-      padding: 2.2mm;
-      background: #fff;
       display: grid;
       grid-template-columns: repeat(6, 1fr);
       grid-template-rows: repeat(6, 1fr);
-      position: relative;
+      border: 0.2mm solid #000;
+      background: #000;
     }
-    .cell {
-      width: 100%;
-      height: 100%;
-    }
+    .cell { width: 100%; height: 100%; }
     .cell.b { background: #000; }
     .cell.w { background: #fff; }
     .sticker-caption {
@@ -146,22 +138,12 @@
       font-weight: 900;
       font-family: monospace;
       margin-top: 1.5mm;
-      letter-spacing: 0.5px;
+      letter-spacing: 0.4px;
     }
     @media print {
-      body {
-        background: #fff;
-        padding: 0;
-      }
-      .no-print-bar {
-        display: none !important;
-      }
-      .a4-sheet {
-        box-shadow: none;
-        margin: 0;
-        width: 100%;
-        padding: 0;
-      }
+      body { background: #fff; padding: 0; }
+      .no-print-bar { display: none !important; }
+      .a4-sheet { box-shadow: none; margin: 0; width: 100%; padding: 0; }
     }
   </style>
 </head>
@@ -169,8 +151,8 @@
 
   <div class="no-print-bar">
     <div>
-      <h2>🖨️ Printable Magnetic Stickers Sheet (Exact 2.00" × 2.00" Scale)</h2>
-      <p>Print karte waqt Printer Settings mein <b>Scale = 100% (Actual Size)</b> rakhein. Print hone ke baad ise Magnetic Sheet par chipka kar dotted line se kaat lein.</p>
+      <h2>🖨️ Official OpenCV ArUco (DICT_4X4_50) Magnetic Stickers — 2.00" × 2.00"</h2>
+      <p>Print karte waqt Printer Settings mein <b>Scale = 100% (Actual Size)</b> rakhein. Print ke baad inch-tape se check karein ke har black square exact <b>2.00 inch (50.8mm)</b> hai.</p>
     </div>
     <button class="print-btn" onclick="window.print()">PRINT A4 SHEET (100%)</button>
   </div>
@@ -178,12 +160,12 @@
   <div class="a4-sheet">
     <div class="sheet-header">
       <div>
-        <h1>FRAMESCAN PRO — MAGNETIC FIDUCIAL MARKERS</h1>
-        <div class="sub">Place every 3–5 feet on pipe frame • Outer Black Box = Exact 2.00" × 2.00" (50.8 mm × 50.8 mm)</div>
+        <h1>FRAMESCAN PRO — ARUCO 4x4_50 FIDUCIAL MARKERS</h1>
+        <div class="sub">Outer Black Square = Exact 2.00" × 2.00" (50.8 mm × 50.8 mm) • Stick every 2.5–4 ft on frame</div>
       </div>
       <div class="ruler-box">
         <div class="ruler-bar"></div>
-        <div class="ruler-label">◄── CHECK: EXACT 2.00 INCHES (50.8mm) ──►</div>
+        <div class="ruler-label">◄── VERIFY: EXACT 2.00 INCHES (50.8mm) ──►</div>
       </div>
     </div>
 
@@ -191,42 +173,50 @@
   </div>
 
   <script>
-    // 12 Unique 6x6 AprilTag/ArUco High-Contrast Binary Patterns (Orientation-asymmetric for 0.5mm corner pose lock)
-    const patterns = [
-      "101101010010110110001011101100011010", // ID #01
-      "110011001101101001011100100110110100", // ID #02
-      "100111011000111010001101101011010010", // ID #03
-      "111001001011100101011010110100001110", // ID #04
-      "101010011101110010010111100101011001", // ID #05
-      "110101010110100111001010111001001101", // ID #06
-      "100011110100011011101100010111101001", // ID #07
-      "111100010011101100011001100110010111", // ID #08
-      "101110001101110011010100101011011010", // ID #09
-      "110001101100011101100110011010101101", // ID #10
-      "100101110010011101101011010100110110", // ID #11
-      "111010001110100011011001101101001011"  // ID #12
+    // Official OpenCV DICT_4X4_50 16-bit inner payloads for IDs 0 through 11 (1 = white, 0 = black inside the 1-cell black border)
+    const ARUCO_4X4_50 = [
+      [0,1,0,0, 1,1,1,0, 1,1,0,0, 1,1,0,1], // ID 0
+      [1,1,1,1, 0,0,0,0, 0,1,1,0, 1,0,0,1], // ID 1
+      [0,0,1,1, 0,0,1,1, 0,0,1,0, 1,1,0,1], // ID 2
+      [1,0,0,1, 1,0,0,1, 0,1,0,0, 0,1,1,0], // ID 3
+      [0,1,0,1, 0,1,0,1, 1,0,1,1, 1,0,0,0], // ID 4
+      [1,1,0,0, 0,1,1,1, 0,0,1,1, 1,0,1,0], // ID 5
+      [0,0,0,1, 1,1,0,1, 1,0,0,1, 0,0,1,1], // ID 6
+      [1,0,1,0, 0,1,0,0, 1,1,1,0, 0,1,0,1], // ID 7
+      [0,1,1,0, 1,0,1,0, 0,1,0,1, 1,1,0,0], // ID 8
+      [1,1,0,1, 1,0,1,1, 1,0,0,0, 0,0,1,0], // ID 9
+      [0,0,1,0, 0,1,1,0, 1,1,0,1, 0,1,1,1], // ID 10
+      [1,0,1,1, 1,1,0,0, 0,0,0,1, 1,0,1,0]  // ID 11
     ];
 
     const grid = document.getElementById("stickerGrid");
-    patterns.forEach((bits, idx) => {
-      const idNum = String(idx + 1).padStart(2, "0");
+    ARUCO_4X4_50.forEach((bits16, id) => {
+      const idStr = String(id + 1).padStart(2, "0");
       const card = document.createElement("div");
       card.className = "sticker-cut-card";
 
-      const sq = document.createElement("div");
-      sq.className = "fiducial-square";
+      const marker = document.createElement("div");
+      marker.className = "aruco-marker";
 
-      for (let i = 0; i < 36; i++) {
-        const cell = document.createElement("div");
-        cell.className = "cell " + (bits[i] === "1" ? "b" : "w");
-        sq.appendChild(cell);
+      // 6x6 grid: outer border ring (r=0, r=5, c=0, c=5) is always BLACK (0); inner 4x4 is bits16
+      for (let r = 0; r < 6; r++) {
+        for (let c = 0; c < 6; c++) {
+          const cell = document.createElement("div");
+          let isWhite = false;
+          if (r >= 1 && r <= 4 && c >= 1 && c <= 4) {
+            const bitIdx = (r - 1) * 4 + (c - 1);
+            isWhite = bits16[bitIdx] === 1;
+          }
+          cell.className = "cell " + (isWhite ? "w" : "b");
+          marker.appendChild(cell);
+        }
       }
 
       const cap = document.createElement("div");
       cap.className = "sticker-caption";
-      cap.textContent = `FRAMESCAN #${idNum} • 2.00"×2.00"`;
+      cap.textContent = `ARUCO #${idStr} (ID:${id}) • 2.00"×2.00"`;
 
-      card.appendChild(sq);
+      card.appendChild(marker);
       card.appendChild(cap);
       grid.appendChild(card);
     });
