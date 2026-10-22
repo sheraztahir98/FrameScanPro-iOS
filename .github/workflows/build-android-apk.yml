@@ -1,0 +1,51 @@
+name: Build Native Android APK (FrameScanPro.apk)
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [ main ]
+    paths:
+      - 'android-app/**'
+      - '.github/workflows/build-android-apk.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  build-android:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v3
+        with:
+          gradle-version: '8.5'
+
+      - name: Build Signed Release APK
+        working-directory: android-app
+        run: |
+          gradle assembleRelease --no-daemon
+          cp app/build/outputs/apk/release/app-release.apk ../FrameScanPro.apk
+          cp app/build/outputs/apk/release/app-release.apk ../docs/FrameScanPro.apk
+          ls -lh ../FrameScanPro.apk
+
+      - name: Upload FrameScanPro.apk Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: FrameScanPro-Android-APK
+          path: FrameScanPro.apk
+
+      - name: Publish FrameScanPro.apk to GitHub Pages (docs/)
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add docs/FrameScanPro.apk
+          git diff --staged --quiet || (git commit -m "Publish compiled FrameScanPro.apk to docs/" && git push origin main)
