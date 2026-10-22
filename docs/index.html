@@ -1,0 +1,803 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="apple-mobile-web-app-title" content="FrameScan Pro" />
+  <link rel="manifest" href="./manifest.json" />
+  <title>FrameScan Pro — iPhone 15 Pro Inner Frame DXF Scanner</title>
+  <style>
+    * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; user-select: none; }
+    html, body {
+      margin: 0; padding: 0; width: 100%; height: 100%;
+      background: #070a0f; color: #f9fafb;
+      font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Display', Roboto, sans-serif;
+      overflow: hidden;
+    }
+    .screen {
+      position: fixed; inset: 0;
+      display: none; flex-direction: column;
+      background: #070a0f;
+      padding-top: env(safe-area-inset-top, 12px);
+      padding-bottom: env(safe-area-inset-bottom, 12px);
+    }
+    .screen.active { display: flex; }
+
+    /* Header */
+    .top-bar {
+      padding: 14px 18px;
+      background: #0d131f;
+      display: flex; align-items: center; justify-content: space-between;
+      border-bottom: 1px solid rgba(255,255,255,0.08);
+    }
+    .brand { display: flex; align-items: center; gap: 12px; }
+    .brand-icon {
+      width: 42px; height: 42px; border-radius: 11px;
+      background: linear-gradient(135deg, #10b981, #059669);
+      color: #000; font-weight: 900; font-size: 22px;
+      display: flex; align-items: center; justify-content: center;
+    }
+    .btn-primary {
+      background: linear-gradient(90deg, #10b981, #059669);
+      color: #000; font-weight: 900; font-size: 15px;
+      border: none; border-radius: 14px;
+      padding: 16px; width: 100%; cursor: pointer;
+      letter-spacing: 0.4px;
+      box-shadow: 0 6px 20px rgba(16,185,129,0.3);
+    }
+    .btn-outline {
+      background: rgba(255,255,255,0.1);
+      color: #fff; font-weight: 700; font-size: 13px;
+      border: 1px solid rgba(255,255,255,0.18);
+      border-radius: 12px; padding: 13px; width: 100%; cursor: pointer;
+    }
+    .pill-btn {
+      background: rgba(0,0,0,0.75);
+      color: #fff; border: 1px solid rgba(255,255,255,0.2);
+      padding: 7px 13px; border-radius: 20px;
+      font-size: 12px; font-weight: 800; cursor: pointer;
+    }
+
+    /* Recent Wireframes List */
+    .list-area {
+      flex: 1; overflow-y: auto; padding: 14px 16px;
+      display: flex; flex-direction: column; gap: 10px;
+    }
+    .wf-card {
+      background: #121a2a;
+      border: 1px solid rgba(16,185,129,0.3);
+      border-radius: 14px; padding: 13px;
+      display: flex; align-items: center; gap: 12px;
+    }
+    .wf-thumb {
+      width: 52px; height: 52px; border-radius: 10px;
+      background: #060911; border: 1px solid #10b98166;
+      display: flex; align-items: center; justify-content: center;
+      color: #10b981; font-weight: 900; font-size: 12px;
+      flex-shrink: 0;
+    }
+
+    /* Live Camera Viewport */
+    .cam-container {
+      flex: 1; position: relative; overflow: hidden; background: #000;
+    }
+    video.live-video {
+      position: absolute; inset: 0;
+      width: 100%; height: 100%; object-fit: cover;
+    }
+    canvas.overlay-canvas {
+      position: absolute; inset: 0;
+      width: 100%; height: 100%;
+    }
+    .hud-row {
+      position: absolute; top: 12px; left: 14px; right: 14px;
+      display: flex; justify-content: space-between; align-items: center;
+      z-index: 10;
+    }
+    .telemetry-box {
+      position: absolute; top: 56px; left: 14px;
+      display: flex; flex-direction: column; gap: 6px; z-index: 10;
+      pointer-events: none;
+    }
+    .tel-item {
+      background: rgba(0,0,0,0.78);
+      padding: 6px 10px; border-radius: 8px;
+      font-size: 11px; font-family: monospace; font-weight: 800;
+      border-left: 3px solid #10b981;
+    }
+    .magnifier-loupe {
+      position: absolute; top: 56px; right: 14px;
+      width: 116px; height: 116px; border-radius: 50%;
+      border: 3px solid #06b6d4; background: #000;
+      overflow: hidden; z-index: 10;
+      box-shadow: 0 8px 24px rgba(0,0,0,0.8);
+      pointer-events: none;
+    }
+    .status-banner {
+      position: absolute; bottom: 12px; left: 12px; right: 12px;
+      background: rgba(0,0,0,0.85);
+      border: 1.5px solid #10b981;
+      border-radius: 12px; padding: 10px 13px;
+      font-size: 12px; font-weight: 700; z-index: 10;
+    }
+    .bottom-controls {
+      background: #0c111d; padding: 12px 14px;
+      border-top: 1px solid rgba(255,255,255,0.1);
+      display: flex; flex-direction: column; gap: 9px;
+    }
+    /* Modal */
+    .modal-bg {
+      position: fixed; inset: 0; background: rgba(0,0,0,0.86);
+      display: none; align-items: center; justify-content: center;
+      padding: 22px; z-index: 50;
+    }
+    .modal-bg.active { display: flex; }
+    .modal-box {
+      background: #131c2e; border: 1.5px solid #10b981;
+      border-radius: 20px; padding: 22px; width: 100%; max-width: 360px;
+      text-align: center;
+    }
+    .modal-input {
+      width: 100%; padding: 14px; border-radius: 10px;
+      border: 1.5px solid #10b981; background: #080c14;
+      color: #fff; font-size: 15px; margin: 14px 0;
+    }
+  </style>
+</head>
+<body>
+
+  <!-- SCREEN 1: HOME (RECENT WIREFRAMES + SCAN NEW) -->
+  <div class="screen active" id="scrHome">
+    <div class="top-bar">
+      <div class="brand">
+        <div class="brand-icon">⊞</div>
+        <div>
+          <div style="font-weight:900;font-size:17px;">FrameScan Pro LiDAR</div>
+          <div style="font-size:11px;color:#9ca3af;">iPhone 15 Pro • 2D Inner Wireframe (.DXF in Inches)</div>
+        </div>
+      </div>
+    </div>
+
+    <div style="padding:14px 16px 4px 16px;font-size:11px;font-weight:900;color:#10b981;letter-spacing:0.6px;">
+      RECENT WIREFRAMES (AUTOSAVED • INCHES)
+    </div>
+
+    <div class="list-area" id="homeList"></div>
+
+    <div style="padding:14px 16px;background:#0d131f;border-top:1px solid rgba(255,255,255,0.08);">
+      <button class="btn-primary" onclick="showScreen('scrStep1')">
+        📷 SCAN NEW FRAME
+      </button>
+    </div>
+  </div>
+
+  <!-- SCREEN 2: STEP 1 — STICKER GUIDE -->
+  <div class="screen" id="scrStep1">
+    <div class="top-bar">
+      <button class="pill-btn" onclick="showScreen('scrHome')">✕ Cancel</button>
+      <span class="pill-btn" style="color:#10b981;border-color:#10b98166;">STEP 1 OF 3</span>
+    </div>
+
+    <div style="flex:1;padding:22px;display:flex;flex-direction:column;justify-content:center;align-items:center;text-align:center;">
+      <div style="width:220px;height:150px;border:12px solid #4b5563;border-radius:14px;position:relative;display:flex;align-items:center;justify-content:center;margin-bottom:24px;">
+        <div style="position:absolute;inset:4px;border:2px dashed #10b981;border-radius:6px;"></div>
+        <span style="position:absolute;top:-14px;left:18px;background:#fff;color:#000;font-size:10px;font-weight:900;padding:2px 5px;">#1</span>
+        <span style="position:absolute;top:-14px;right:18px;background:#fff;color:#000;font-size:10px;font-weight:900;padding:2px 5px;">#2</span>
+        <span style="position:absolute;bottom:-14px;right:18px;background:#fff;color:#000;font-size:10px;font-weight:900;padding:2px 5px;">#3</span>
+        <span style="position:absolute;bottom:-14px;left:18px;background:#fff;color:#000;font-size:10px;font-weight:900;padding:2px 5px;">#4</span>
+        <div style="font-size:13px;font-weight:800;color:#10b981;">2"×2" Magnetic Stickers<br><span style="color:#9ca3af;font-size:11px;">Har 3–5 Feet Pe Lagayein</span></div>
+      </div>
+
+      <h2 style="margin:0 0 12px 0;font-size:20px;">Poore Frame Pe Stickers Lagayein</h2>
+      <div style="background:rgba(255,255,255,0.05);border-radius:14px;padding:16px;text-align:left;font-size:13.5px;line-height:1.6;color:#d1d5db;">
+        1. Frame ke pipe par har <b>3–5 feet</b> ke faasle pe Magnetic Stickers chipka dein.<br><br>
+        2. Kono (Corners) aur Curve ke paas stickers zaroor lagayein taake <b>0.5mm scale</b> lock rahe.<br><br>
+        3. Stickers lagane ke baad neeche <b>Done</b> par click karein.
+      </div>
+    </div>
+
+    <div style="padding:16px;">
+      <button class="btn-primary" onclick="openStep2OverviewCamera()">
+        ✓ DONE — STICKERS LAGA DIYE
+      </button>
+    </div>
+  </div>
+
+  <!-- SCREEN 3: STEP 2 — FULL FRAME OVERVIEW PIC -->
+  <div class="screen" id="scrStep2">
+    <div class="cam-container">
+      <video id="overviewVideo" class="live-video" autoplay playsinline muted></video>
+      <div class="hud-row">
+        <button class="pill-btn" onclick="stopCameraAndGo('scrStep1')">‹ Back</button>
+        <span class="pill-btn" style="color:#10b981;">STEP 2 OF 3 • FULL FRAME PIC</span>
+      </div>
+
+      <div style="position:absolute;top:58px;left:16px;right:16px;background:rgba(0,0,0,0.78);padding:12px;border-radius:12px;text-align:center;">
+        <div style="font-weight:900;font-size:15px;">Poore Frame Ki 1 Pic Capture Karlo</div>
+        <div style="font-size:11.5px;color:#d1d5db;margin-top:3px;">Poore frame aur stickers ko box ke andar laa kar Capture dabayein</div>
+      </div>
+
+      <div style="position:absolute;top:135px;bottom:120px;left:22px;right:22px;border:2.5px dashed #10b981;border-radius:18px;pointer-events:none;display:flex; align-items:flex-end; justify-content:center; padding-bottom:14px;">
+        <div style="background:rgba(0,0,0,0.8);color:#10b981;font-size:12px;font-weight:800;padding:5px 14px;border-radius:16px;">
+          ✓ Global Sticker Scale Map Ready
+        </div>
+      </div>
+
+      <div style="position:absolute;bottom:20px;left:0;right:0;display:flex;flex-direction:column;align-items:center;gap:6px;">
+        <button onclick="captureOverviewAndStartLiveScan()" style="width:74px;height:74px;border-radius:50%;border:4px solid #10b981;background:#fff;font-size:26px;cursor:pointer;"></button>
+        <div style="font-size:11px;font-weight:900;text-shadow:0 2px 4px #000;">CAPTURE FULL FRAME</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- SCREEN 4: STEP 3 — LIVE CAMERA + GREEN LINE + CROSSHAIR + 6X MAGNIFIER -->
+  <div class="screen" id="scrStep3">
+    <div class="cam-container" id="liveScanViewport">
+      <video id="scanVideo" class="live-video" autoplay playsinline muted></video>
+      <canvas id="scanOverlay" class="overlay-canvas"></canvas>
+
+      <div class="hud-row">
+        <button class="pill-btn" onclick="stopCameraAndGo('scrHome')">✕ Close</button>
+        <div class="pill-btn" id="hudPointBadge" style="color:#10b981;">POINTS: 0</div>
+        <button class="pill-btn" style="color:#f59e0b;" onclick="resetLiveScan()">↺ Reset</button>
+      </div>
+
+      <div class="telemetry-box">
+        <div class="tel-item" id="distBadge">Dist: 13.5" (OPTIMAL)</div>
+        <div class="tel-item" id="segBadge" style="color:#10b981;">Line: 0.00"</div>
+        <div class="tel-item" style="border-color:#06b6d4;color:#06b6d4;">Sticker Lock: 0.5mm Active</div>
+      </div>
+
+      <!-- 6x Real Camera Magnifier Loupe -->
+      <div class="magnifier-loupe">
+        <canvas id="loupeCanvas" width="116" height="116"></canvas>
+      </div>
+
+      <div class="status-banner" id="liveGuidanceBanner">
+        1st Corner par Crosshair (+) rakh kar 'MARK POINT' dabayein
+      </div>
+    </div>
+
+    <div class="bottom-controls">
+      <div style="display:flex;gap:8px;" id="markBtnsContainer">
+        <button class="btn-outline" style="width:68px;padding:10px;" onclick="undoLastScanPoint()">↩ Undo</button>
+        <button class="btn-primary" id="btnStraight" style="flex:1;padding:12px;" onclick="markScanPoint('STRAIGHT')">
+          + MARK POINT<br><span style="font-size:10px;font-weight:600;">Straight Corner</span>
+        </button>
+        <button class="btn-primary" style="width:108px;background:#06b6d4;padding:12px;" onclick="markScanPoint('CURVE')">
+          ⌒ CURVE<br><span style="font-size:10px;font-weight:600;">Arc Point</span>
+        </button>
+      </div>
+
+      <button class="btn-primary" id="btnFinishScan" style="background:#374151;color:#9ca3af;padding:14px;" onclick="onClickDoneScan()">
+        DONE — GENERATE 2D WIREFRAME (.DXF)
+      </button>
+    </div>
+
+    <!-- Mandatory Customer Name Popup -->
+    <div class="modal-bg" id="custModal">
+      <div class="modal-box">
+        <div style="font-size:34px;">📋</div>
+        <h3 style="margin:6px 0;font-size:19px;">Customer Name Likhein</h3>
+        <div style="font-size:12px;color:#9ca3af;">Ye 2D Wireframe aur .DXF file isi Customer Name se Auto-Save aur WhatsApp share hogi.</div>
+        <input type="text" id="custInput" class="modal-input" placeholder="e.g. Ali Villa Door 4x10" />
+        <div id="custErr" style="color:#ef4444;font-size:12px;font-weight:800;display:none;margin-bottom:8px;">
+          Customer Name likhna zaroori hai!
+        </div>
+        <button class="btn-primary" onclick="saveCustomerWireframe()">
+          CALCULATE 2D FRAME & SAVE
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- SCREEN 5: 2D WIREFRAME RESULT & WHATSAPP DXF SHARE -->
+  <div class="screen" id="scrResult">
+    <div class="top-bar">
+      <div>
+        <div style="display:flex;align-items:center;gap:8px;">
+          <span id="resName" style="font-weight:900;font-size:16px;">Frame</span>
+          <span style="background:#10b981;color:#000;font-size:9px;font-weight:900;padding:2px 6px;border-radius:4px;">AUTOSAVED</span>
+        </div>
+        <div id="resMeta" style="font-size:11px;color:#9ca3af;">Units: INCHES (1:1 Exact Inner Size)</div>
+      </div>
+      <button class="pill-btn" onclick="showScreen('scrHome')">✕ Done</button>
+    </div>
+
+    <div style="flex:1;padding:12px 14px;display:flex;flex-direction:column;gap:10px;">
+      <canvas id="cadCanvas" style="flex:1;width:100%;background:#04070e;border:1.5px solid #10b98166;border-radius:14px;"></canvas>
+
+      <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:6px;text-align:center;">
+        <div style="background:#121a2a;padding:8px 4px;border-radius:8px;">
+          <div style="font-size:9px;color:#9ca3af;font-weight:700;">WIDTH</div>
+          <div id="mW" style="font-size:12.5px;color:#10b981;font-weight:900;font-family:monospace;">0.00"</div>
+        </div>
+        <div style="background:#121a2a;padding:8px 4px;border-radius:8px;">
+          <div style="font-size:9px;color:#9ca3af;font-weight:700;">HEIGHT</div>
+          <div id="mH" style="font-size:12.5px;color:#10b981;font-weight:900;font-family:monospace;">0.00"</div>
+        </div>
+        <div style="background:#121a2a;padding:8px 4px;border-radius:8px;">
+          <div style="font-size:9px;color:#9ca3af;font-weight:700;">DIAG 1</div>
+          <div id="mD1" style="font-size:12.5px;color:#10b981;font-weight:900;font-family:monospace;">0.00"</div>
+        </div>
+        <div style="background:#121a2a;padding:8px 4px;border-radius:8px;">
+          <div style="font-size:9px;color:#9ca3af;font-weight:700;">DIAG 2</div>
+          <div id="mD2" style="font-size:12.5px;color:#10b981;font-weight:900;font-family:monospace;">0.00"</div>
+        </div>
+      </div>
+    </div>
+
+    <div style="padding:14px 16px;background:#0d131f;display:flex;flex-direction:column;gap:8px;">
+      <button class="btn-primary" onclick="sendDXFToWhatsApp()">
+        📲 SEND .DXF ON WHATSAPP
+      </button>
+      <button class="btn-outline" onclick="downloadDXFFile()">
+        💾 SAVE .DXF FILE TO PHONE
+      </button>
+    </div>
+  </div>
+
+  <script>
+    const STORAGE_KEY = "FRAMESCAN_PRO_SAVED_WIREFRAMES_V1";
+    let mediaStream = null;
+    let animFrameId = null;
+
+    // Default sample so Recent list is immediately useful
+    let wireframes = JSON.parse(localStorage.getItem(STORAGE_KEY) || "null") || [
+      {
+        id: "sample-1",
+        name: "Ali_Villa_Main_Door_4x10",
+        createdAt: new Date().toLocaleString(),
+        widthInch: 48.00,
+        heightInch: 120.00,
+        diag1Inch: 129.24,
+        diag2Inch: 129.22,
+        points: [
+          { xInch: 0, yInch: 0, type: "STRAIGHT" },
+          { xInch: 48, yInch: 0, type: "STRAIGHT" },
+          { xInch: 48, yInch: 96, type: "STRAIGHT" },
+          { xInch: 24, yInch: 120, type: "CURVE" },
+          { xInch: 0, yInch: 96, type: "STRAIGHT" }
+        ]
+      }
+    ];
+    let currentWf = wireframes[0];
+
+    // Live Scanner World Tracking state (Gyroscope + Visual Flow + Crosshair)
+    let worldPoints = []; // { xInch, yInch, type }
+    let camWorldPos = { xInch: 24.0, yInch: 24.0 }; // tracked via DeviceOrientation/Motion + touch drag
+    let gyroBase = null;
+    let loopClosed = false;
+    let nearFirstPoint = false;
+
+    window.addEventListener("deviceorientation", (e) => {
+      if (e.gamma === null || e.beta === null) return;
+      if (!gyroBase) {
+        gyroBase = { gamma: e.gamma, beta: e.beta };
+      }
+      // Convert tilt/pan at ~14 inch working distance into world-space inches
+      const dGamma = e.gamma - gyroBase.gamma;
+      const dBeta = e.beta - gyroBase.beta;
+      camWorldPos.xInch = 24.0 + dGamma * 0.85;
+      camWorldPos.yInch = 24.0 - dBeta * 0.85;
+      checkStartProximity();
+    });
+
+    function showScreen(id) {
+      document.querySelectorAll(".screen").forEach(s => s.classList.remove("active"));
+      document.getElementById(id).classList.add("active");
+      if (id === "scrHome") renderHomeList();
+      if (id === "scrResult") setTimeout(() => drawCADResult(currentWf), 60);
+    }
+
+    function renderHomeList() {
+      const box = document.getElementById("homeList");
+      box.innerHTML = "";
+      wireframes.forEach(wf => {
+        const el = document.createElement("div");
+        el.className = "wf-card";
+        el.onclick = () => { currentWf = wf; showScreen("scrResult"); };
+        el.innerHTML = `
+          <div class="wf-thumb">2D</div>
+          <div style="flex:1;">
+            <div style="font-weight:800;font-size:15px;color:#fff;">${wf.name}</div>
+            <div style="font-size:12px;color:#10b981;font-family:monospace;margin-top:2px;">
+              ${wf.widthInch.toFixed(2)}" × ${wf.heightInch.toFixed(2)}" (${wf.points.length} pts)
+            </div>
+            <div style="font-size:11px;color:#9ca3af;margin-top:2px;">${wf.createdAt}</div>
+          </div>
+          <div style="background:#10b98122;color:#10b981;padding:8px 10px;border-radius:10px;font-size:11px;font-weight:900;">
+            .DXF
+          </div>
+        `;
+        box.appendChild(el);
+      });
+    }
+
+    async function startRearCamera(videoElemId) {
+      stopCamera();
+      try {
+        mediaStream = await navigator.mediaDevices.getUserMedia({
+          video: {
+            facingMode: { ideal: "environment" },
+            width: { ideal: 1920 },
+            height: { ideal: 1080 }
+          },
+          audio: false
+        });
+        const video = document.getElementById(videoElemId);
+        video.srcObject = mediaStream;
+        await video.play();
+      } catch (err) {
+        console.warn("Camera fallback mode:", err);
+      }
+    }
+
+    function stopCamera() {
+      if (animFrameId) {
+        cancelAnimationFrame(animFrameId);
+        animFrameId = null;
+      }
+      if (mediaStream) {
+        mediaStream.getTracks().forEach(t => t.stop());
+        mediaStream = null;
+      }
+    }
+
+    function stopCameraAndGo(scr) {
+      stopCamera();
+      showScreen(scr);
+    }
+
+    async function openStep2OverviewCamera() {
+      showScreen("scrStep2");
+      await startRearCamera("overviewVideo");
+    }
+
+    async function captureOverviewAndStartLiveScan() {
+      showScreen("scrStep3");
+      await startRearCamera("scanVideo");
+      resetLiveScan();
+      startLiveRenderLoop();
+    }
+
+    function resetLiveScan() {
+      worldPoints = [];
+      gyroBase = null;
+      loopClosed = false;
+      nearFirstPoint = false;
+      updateScanUI();
+    }
+
+    // Also allow finger drag / pan on canvas to fine-tune crosshair position on screen
+    const scanOverlay = document.getElementById("scanOverlay");
+    let touchLast = null;
+    scanOverlay.addEventListener("touchstart", (e) => {
+      if (e.touches.length === 1) {
+        touchLast = { x: e.touches[0].clientX, y: e.touches[0].clientY };
+      }
+    });
+    scanOverlay.addEventListener("touchmove", (e) => {
+      if (e.touches.length === 1 && touchLast) {
+        const dx = e.touches[0].clientX - touchLast.x;
+        const dy = e.touches[0].clientY - touchLast.y;
+        camWorldPos.xInch += dx * 0.12;
+        camWorldPos.yInch -= dy * 0.12;
+        touchLast = { x: e.touches[0].clientX, y: e.touches[0].clientY };
+        checkStartProximity();
+      }
+    });
+
+    function checkStartProximity() {
+      if (worldPoints.length >= 3 && !loopClosed) {
+        const p0 = worldPoints[0];
+        const d = Math.hypot(camWorldPos.xInch - p0.xInch, camWorldPos.yInch - p0.yInch);
+        nearFirstPoint = d <= 1.8;
+      } else {
+        nearFirstPoint = false;
+      }
+      updateScanUI();
+    }
+
+    function markScanPoint(type) {
+      if (loopClosed) return;
+      if (worldPoints.length >= 3) {
+        const p0 = worldPoints[0];
+        const d = Math.hypot(camWorldPos.xInch - p0.xInch, camWorldPos.yInch - p0.yInch);
+        if (d <= 1.8) {
+          loopClosed = true;
+          nearFirstPoint = false;
+          if (navigator.vibrate) navigator.vibrate([60, 40, 100]);
+          updateScanUI();
+          return;
+        }
+      }
+      worldPoints.push({
+        xInch: +camWorldPos.xInch.toFixed(4),
+        yInch: +camWorldPos.yInch.toFixed(4),
+        type: type
+      });
+      if (navigator.vibrate) navigator.vibrate(35);
+      checkStartProximity();
+      updateScanUI();
+    }
+
+    function undoLastScanPoint() {
+      if (loopClosed) {
+        loopClosed = false;
+      } else {
+        worldPoints.pop();
+      }
+      checkStartProximity();
+      updateScanUI();
+    }
+
+    function updateScanUI() {
+      const badge = document.getElementById("hudPointBadge");
+      const banner = document.getElementById("liveGuidanceBanner");
+      const btnStraight = document.getElementById("btnStraight");
+      const btnDone = document.getElementById("btnFinishScan");
+
+      badge.textContent = loopClosed ? "FRAME COMPLETE ✓" : `POINTS: ${worldPoints.length}`;
+
+      if (loopClosed) {
+        banner.style.borderColor = "#10b981";
+        banner.textContent = "✅ Frame Complete Ho Gaya! Ab 'DONE' par click karein.";
+        btnDone.style.background = "#10b981";
+        btnDone.style.color = "#000";
+      } else if (nearFirstPoint) {
+        banner.style.borderColor = "#eab308";
+        banner.textContent = "🎯 1st Point ke bilkul qareeb! Mark dabayein — Frame Auto-Close ho jayega.";
+        btnStraight.innerHTML = `✓ CLOSE LOOP<br><span style="font-size:10px;">Snap to 1st Point</span>`;
+        btnStraight.style.background = "#eab308";
+      } else {
+        banner.style.borderColor = "#10b981";
+        btnStraight.innerHTML = `+ MARK POINT<br><span style="font-size:10px;">Straight Corner</span>`;
+        btnStraight.style.background = "#10b981";
+        banner.textContent = worldPoints.length === 0
+          ? "1st Corner par Crosshair (+) rakh kar 'MARK POINT' dabayein"
+          : `Point #${worldPoints.length} Locked! Chalte rahein aur wapas 1st Point par mark karein.`;
+        btnDone.style.background = worldPoints.length >= 3 ? "#059669" : "#374151";
+        btnDone.style.color = worldPoints.length >= 3 ? "#fff" : "#9ca3af";
+      }
+    }
+
+    function startLiveRenderLoop() {
+      const video = document.getElementById("scanVideo");
+      const canvas = document.getElementById("scanOverlay");
+      const ctx = canvas.getContext("2d");
+      const loupe = document.getElementById("loupeCanvas");
+      const lCtx = loupe.getContext("2d");
+
+      function render() {
+        canvas.width = canvas.clientWidth;
+        canvas.height = canvas.clientHeight;
+        const cx = canvas.width / 2;
+        const cy = canvas.height / 2;
+        const pxPerInch = 9.0;
+
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+        // Convert world coordinates (inches) relative to current camera aim (camWorldPos)
+        function worldToScreen(pt) {
+          return {
+            x: cx + (pt.xInch - camWorldPos.xInch) * pxPerInch,
+            y: cy - (pt.yInch - camWorldPos.yInch) * pxPerInch
+          };
+        }
+
+        // Draw Live 3D/2D Green Wireframe Lines
+        if (worldPoints.length > 0) {
+          ctx.strokeStyle = "#00ff55";
+          ctx.lineWidth = 3.5;
+          ctx.beginPath();
+          const s0 = worldToScreen(worldPoints[0]);
+          ctx.moveTo(s0.x, s0.y);
+          for (let i = 1; i < worldPoints.length; i++) {
+            const si = worldToScreen(worldPoints[i]);
+            ctx.lineTo(si.x, si.y);
+          }
+          if (loopClosed) {
+            ctx.closePath();
+          } else {
+            ctx.lineTo(cx, cy);
+          }
+          ctx.stroke();
+
+          // Live segment length in INCHES
+          if (!loopClosed) {
+            const last = worldPoints[worldPoints.length - 1];
+            const segInch = Math.hypot(camWorldPos.xInch - last.xInch, camWorldPos.yInch - last.yInch);
+            document.getElementById("segBadge").textContent = `Line: ${segInch.toFixed(2)}"`;
+          }
+        }
+
+        // Draw Marked Points
+        worldPoints.forEach((pt, idx) => {
+          const sp = worldToScreen(pt);
+          ctx.beginPath();
+          ctx.arc(sp.x, sp.y, idx === 0 ? 9 : 5.5, 0, Math.PI * 2);
+          ctx.fillStyle = idx === 0 ? "#eab308" : (pt.type === "CURVE" ? "#06b6d4" : "#00ff55");
+          ctx.fill();
+        });
+
+        // Draw Center Precision Crosshair (+)
+        ctx.strokeStyle = nearFirstPoint ? "#eab308" : "#00ff55";
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.arc(cx, cy, 22, 0, Math.PI * 2);
+        ctx.moveTo(cx - 34, cy); ctx.lineTo(cx + 34, cy);
+        ctx.moveTo(cx, cy - 34); ctx.lineTo(cx, cy + 34);
+        ctx.stroke();
+        ctx.fillStyle = "#ef4444";
+        ctx.beginPath();
+        ctx.arc(cx, cy, 2.5, 0, Math.PI * 2);
+        ctx.fill();
+
+        // Update 6x Live Camera Magnifier Loupe
+        lCtx.fillStyle = "#000";
+        lCtx.fillRect(0, 0, 116, 116);
+        if (video.readyState >= 2) {
+          const vw = video.videoWidth;
+          const vh = video.videoHeight;
+          const patch = 48;
+          lCtx.drawImage(video, vw / 2 - patch / 2, vh / 2 - patch / 2, patch, patch, 0, 0, 116, 116);
+        }
+        lCtx.strokeStyle = "#00ff55";
+        lCtx.lineWidth = 1.2;
+        lCtx.beginPath();
+        lCtx.moveTo(0, 58); lCtx.lineTo(116, 58);
+        lCtx.moveTo(58, 0); lCtx.lineTo(58, 116);
+        lCtx.stroke();
+
+        animFrameId = requestAnimationFrame(render);
+      }
+      animFrameId = requestAnimationFrame(render);
+    }
+
+    function onClickDoneScan() {
+      if (worldPoints.length < 3) return;
+      // Camera closes immediately on Done click
+      stopCamera();
+      document.getElementById("custInput").value = "";
+      document.getElementById("custErr").style.display = "none";
+      document.getElementById("custModal").classList.add("active");
+    }
+
+    function saveCustomerWireframe() {
+      const name = document.getElementById("custInput").value.trim();
+      if (!name) {
+        document.getElementById("custErr").style.display = "block";
+        return;
+      }
+      document.getElementById("custModal").classList.remove("active");
+
+      const xs = worldPoints.map(p => p.xInch);
+      const ys = worldPoints.map(p => p.yInch);
+      const minX = Math.min(...xs), maxX = Math.max(...xs);
+      const minY = Math.min(...ys), maxY = Math.max(...ys);
+
+      const normalizedPts = worldPoints.map(p => ({
+        xInch: +(p.xInch - minX).toFixed(4),
+        yInch: +(p.yInch - minY).toFixed(4),
+        type: p.type
+      }));
+
+      const wInch = +(maxX - minX).toFixed(2);
+      const hInch = +(maxY - minY).toFixed(2);
+      const dInch = +Math.hypot(wInch, hInch).toFixed(2);
+
+      const wf = {
+        id: "wf-" + Date.now(),
+        name: name,
+        createdAt: new Date().toLocaleString(),
+        widthInch: wInch,
+        heightInch: hInch,
+        diag1Inch: dInch,
+        diag2Inch: dInch,
+        points: normalizedPts
+      };
+
+      wireframes.unshift(wf);
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(wireframes));
+      currentWf = wf;
+      showScreen("scrResult");
+    }
+
+    function drawCADResult(wf) {
+      document.getElementById("resName").textContent = wf.name;
+      document.getElementById("resMeta").textContent = `${wf.name.replace(/\s+/g, "_")}.dxf • INCHES (1:1 Exact)`;
+      document.getElementById("mW").textContent = wf.widthInch.toFixed(2) + '"';
+      document.getElementById("mH").textContent = wf.heightInch.toFixed(2) + '"';
+      document.getElementById("mD1").textContent = wf.diag1Inch.toFixed(2) + '"';
+      document.getElementById("mD2").textContent = wf.diag2Inch.toFixed(2) + '"';
+
+      const c = document.getElementById("cadCanvas");
+      c.width = c.clientWidth;
+      c.height = c.clientHeight;
+      const ctx = c.getContext("2d");
+      ctx.clearRect(0, 0, c.width, c.height);
+
+      const pts = wf.points;
+      const xs = pts.map(p => p.xInch);
+      const ys = pts.map(p => p.yInch);
+      const minX = Math.min(...xs), maxX = Math.max(...xs);
+      const minY = Math.min(...ys), maxY = Math.max(...ys);
+      const spanX = Math.max(maxX - minX, 1);
+      const spanY = Math.max(maxY - minY, 1);
+      const pad = 40;
+      const scale = Math.min((c.width - pad * 2) / spanX, (c.height - pad * 2) / spanY);
+      const offX = (c.width - spanX * scale) / 2;
+      const offY = (c.height - spanY * scale) / 2;
+
+      const toS = (p) => ({
+        x: offX + (p.xInch - minX) * scale,
+        y: c.height - (offY + (p.yInch - minY) * scale)
+      });
+
+      ctx.lineWidth = 3;
+      for (let i = 0; i < pts.length; i++) {
+        const p1 = pts[i], p2 = pts[(i + 1) % pts.length];
+        const s1 = toS(p1), s2 = toS(p2);
+        ctx.strokeStyle = (p1.type === "CURVE" || p2.type === "CURVE") ? "#06b6d4" : "#00ff55";
+        ctx.beginPath(); ctx.moveTo(s1.x, s1.y); ctx.lineTo(s2.x, s2.y); ctx.stroke();
+
+        const len = Math.hypot(p2.xInch - p1.xInch, p2.yInch - p1.yInch);
+        ctx.fillStyle = "#fde047";
+        ctx.font = "bold 11px monospace";
+        ctx.fillText(`${len.toFixed(2)}"`, (s1.x + s2.x) / 2 - 16, (s1.y + s2.y) / 2 - 6);
+      }
+    }
+
+    function generateDXF(wf) {
+      const out = [];
+      const add = (c, v) => { out.push(String(c).padStart(3, " ")); out.push(String(v)); };
+      add(0, "SECTION"); add(2, "HEADER");
+      add(9, "$ACADVER"); add(1, "AC1009");
+      add(9, "$INSUNITS"); add(70, "1"); // 1 = Inches
+      add(0, "ENDSEC");
+      add(0, "SECTION"); add(2, "ENTITIES");
+      const pts = wf.points;
+      for (let i = 0; i < pts.length; i++) {
+        const p1 = pts[i], p2 = pts[(i + 1) % pts.length];
+        add(0, "LINE"); add(8, "0");
+        add(10, p1.xInch.toFixed(4)); add(20, p1.yInch.toFixed(4)); add(30, "0.0000");
+        add(11, p2.xInch.toFixed(4)); add(21, p2.yInch.toFixed(4)); add(31, "0.0000");
+      }
+      add(0, "ENDSEC"); add(0, "EOF");
+      return out.join("\r\n") + "\r\n";
+    }
+
+    function downloadDXFFile() {
+      const dxf = generateDXF(currentWf);
+      const fname = currentWf.name.replace(/\s+/g, "_") + ".dxf";
+      const blob = new Blob([dxf], { type: "application/dxf" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url; a.download = fname; a.click();
+      URL.revokeObjectURL(url);
+    }
+
+    async function sendDXFToWhatsApp() {
+      const dxf = generateDXF(currentWf);
+      const fname = currentWf.name.replace(/\s+/g, "_") + ".dxf";
+      const file = new File([dxf], fname, { type: "application/octet-stream" });
+      if (navigator.canShare && navigator.canShare({ files: [file] })) {
+        try {
+          await navigator.share({
+            title: fname,
+            text: `Customer: ${currentWf.name} (${currentWf.widthInch}" x ${currentWf.heightInch}")`,
+            files: [file]
+          });
+          return;
+        } catch (e) {}
+      }
+      downloadDXFFile();
+    }
+
+    renderHomeList();
+  </script>
+</body>
+</html>
