@@ -18,7 +18,9 @@ jobs:
 
       - name: Generate Xcode Project
         working-directory: ios-app
-        run: xcodegen generate
+        run: |
+          xcodegen generate
+          sed -i '' 's/objectVersion = 77;/objectVersion = 56;/g' FrameScanPro.xcodeproj/project.pbxproj
 
       - name: Build Unsigned iOS App Archive (iPhone 15 Pro arm64)
         working-directory: ios-app
