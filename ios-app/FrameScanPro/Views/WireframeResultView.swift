@@ -1,6 +1,11 @@
 import SwiftUI
 import UIKit
 
+struct ShareableDXFItem: Identifiable {
+    let id = UUID()
+    let url: URL
+}
+
 /// Displays the flattened 2D Single-Line Wireframe in exact INCHES with:
 /// - Interactive CAD grid preview (showing straight LINEs, smooth ARCs, and segment dimensions in inches)
 /// - Width, Height, Diagonals, and Perimeter in inches
@@ -9,8 +14,7 @@ struct WireframeResultView: View {
     let wireframe: SavedWireframe
     @Environment(\.dismiss) private var dismiss
     
-    @State private var dxfFileURL: URL?
-    @State private var showShareSheet = false
+    @State private var shareItem: ShareableDXFItem?
     @State private var saveToastMessage: String?
     
     var body: some View {
@@ -81,7 +85,6 @@ struct WireframeResultView: View {
                 
                 // Save DXF & Send on WhatsApp Buttons
                 VStack(spacing: 10) {
-                    // Send DXF on WhatsApp (Primary Action)
                     Button {
                         prepareAndShareDXF()
                     } label: {
@@ -98,7 +101,6 @@ struct WireframeResultView: View {
                         .cornerRadius(14)
                     }
                     
-                    // Save DXF to iPhone Files
                     Button {
                         saveDXFToDevice()
                     } label: {
@@ -118,10 +120,8 @@ struct WireframeResultView: View {
                 .padding(.bottom, 18)
             }
         }
-        .sheet(isPresented: $showShareSheet) {
-            if let url = dxfFileURL {
-                ShareSheetView(activityItems: [url])
-            }
+        .sheet(item: $shareItem) { item in
+            ShareSheetView(activityItems: [item.url])
         }
     }
     
@@ -143,8 +143,7 @@ struct WireframeResultView: View {
     private func prepareAndShareDXF() {
         do {
             let url = try DXFGenerator.exportDXFFile(for: wireframe)
-            dxfFileURL = url
-            showShareSheet = true
+            shareItem = ShareableDXFItem(url: url)
         } catch {
             saveToastMessage = "DXF Error: \(error.localizedDescription)"
         }
@@ -153,23 +152,20 @@ struct WireframeResultView: View {
     private func saveDXFToDevice() {
         do {
             let url = try DXFGenerator.exportDXFFile(for: wireframe)
-            dxfFileURL = url
             saveToastMessage = "Saved: \(url.lastPathComponent) (Inches 1:1)"
-            showShareSheet = true
+            shareItem = ShareableDXFItem(url: url)
         } catch {
             saveToastMessage = "Error saving DXF: \(error.localizedDescription)"
         }
     }
 }
 
-/// Renders the 2D CAD Single-Line Wireframe with engineering grid, vertices, curves, and segment lengths in INCHES.
 struct CAD2DWireframeCanvas: View {
     let wireframe: SavedWireframe
     
     var body: some View {
         GeometryReader { geo in
             Canvas { context, size in
-                // 1. Draw subtle CAD grid
                 let gridStep: CGFloat = 28.0
                 var gridPath = Path()
                 var gx: CGFloat = 0
@@ -208,7 +204,6 @@ struct CAD2DWireframeCanvas: View {
                     return CGPoint(x: sx, y: sy)
                 }
                 
-                // 2. Draw CAD Entities (LINE and ARC)
                 for entity in wireframe.cadEntities {
                     switch entity {
                     case .line(_, let start, let end):
@@ -219,7 +214,6 @@ struct CAD2DWireframeCanvas: View {
                         linePath.addLine(to: p2)
                         context.stroke(linePath, with: .color(.green), lineWidth: 2.8)
                         
-                        // Draw segment length label in inches
                         let mid = CGPoint(x: (p1.x + p2.x) * 0.5, y: (p1.y + p2.y) * 0.5)
                         let lenInch = hypot(end.xInch - start.xInch, end.yInch - start.yInch)
                         let label = Text(String(format: "%.2f\"", lenInch))
@@ -231,7 +225,6 @@ struct CAD2DWireframeCanvas: View {
                         let cScreen = toScreen(center)
                         let rScreen = CGFloat(radiusInch) * scale
                         var arcPath = Path()
-                        // Convert DXF CCW angles to SwiftUI screen coordinates (where Y is flipped)
                         arcPath.addArc(
                             center: cScreen,
                             radius: rScreen,
@@ -251,7 +244,6 @@ struct CAD2DWireframeCanvas: View {
                     }
                 }
                 
-                // 3. Draw Vertices
                 for pt in pts {
                     let sp = toScreen(pt)
                     let rect = CGRect(x: sp.x - 4, y: sp.y - 4, width: 8, height: 8)
@@ -265,7 +257,6 @@ struct CAD2DWireframeCanvas: View {
     }
 }
 
-/// Native iOS Share Sheet (`UIActivityViewController`) for 1-Tap WhatsApp / AirDrop / Files sharing of the `.dxf` file.
 struct ShareSheetView: UIViewControllerRepresentable {
     let activityItems: [Any]
     
