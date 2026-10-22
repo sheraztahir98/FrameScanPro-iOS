@@ -1,0 +1,48 @@
+name: Build iOS App (.ipa for Sideloadly)
+
+on:
+  push:
+    branches: [ main, master ]
+  workflow_dispatch:
+
+jobs:
+  build-ipa:
+    name: Compile FrameScanPro on Cloud Mac
+    runs-on: macos-14
+    steps:
+      - name: Checkout Source Code
+        uses: actions/checkout@v4
+
+      - name: Install XcodeGen
+        run: brew install xcodegen
+
+      - name: Generate Xcode Project
+        working-directory: ios-app
+        run: xcodegen generate
+
+      - name: Build Unsigned iOS App Archive (iPhone 15 Pro arm64)
+        working-directory: ios-app
+        run: |
+          xcodebuild clean build \
+            -project FrameScanPro.xcodeproj \
+            -scheme FrameScanPro \
+            -configuration Release \
+            -sdk iphoneos \
+            -derivedDataPath build \
+            CODE_SIGN_IDENTITY="" \
+            CODE_SIGNING_REQUIRED=NO \
+            CODE_SIGNING_ALLOWED=NO
+
+      - name: Package .app into Sideloadable .ipa
+        working-directory: ios-app
+        run: |
+          mkdir -p Payload
+          cp -r build/Build/Products/Release-iphoneos/FrameScanPro.app Payload/
+          zip -r9 FrameScanPro.ipa Payload
+
+      - name: Upload FrameScanPro.ipa Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: FrameScanPro-iOS-IPA
+          path: ios-app/FrameScanPro.ipa
+          if-no-files-found: error
