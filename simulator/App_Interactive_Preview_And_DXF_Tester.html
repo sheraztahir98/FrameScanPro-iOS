@@ -1,0 +1,973 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>FrameScan Pro — iPhone 15 Pro Interactive Simulator & DXF Generator</title>
+  <style>
+    * { box-sizing: border-box; user-select: none; }
+    body {
+      margin: 0;
+      padding: 20px;
+      background: #070a0f;
+      color: #f3f4f6;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      display: flex;
+      justify-content: center;
+      align-items: flex-start;
+      gap: 28px;
+      min-height: 100vh;
+    }
+    /* iPhone 15 Pro Shell */
+    .iphone-frame {
+      width: 400px;
+      height: 820px;
+      background: #0d111a;
+      border-radius: 50px;
+      border: 10px solid #272e3f;
+      box-shadow: 0 25px 60px rgba(0, 0, 0, 0.75), 0 0 0 2px #10b98144;
+      position: relative;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+      flex-shrink: 0;
+    }
+    .dynamic-island {
+      width: 116px;
+      height: 28px;
+      background: #000;
+      border-radius: 20px;
+      margin: 10px auto 6px auto;
+      z-index: 20;
+      flex-shrink: 0;
+    }
+    .screen {
+      flex: 1;
+      display: none;
+      flex-direction: column;
+      overflow: hidden;
+      position: relative;
+    }
+    .screen.active {
+      display: flex;
+    }
+    /* Common Buttons */
+    .btn-green {
+      background: linear-gradient(90deg, #10b981, #059669);
+      color: #000;
+      font-weight: 900;
+      border: none;
+      padding: 15px 18px;
+      border-radius: 14px;
+      font-size: 14px;
+      cursor: pointer;
+      width: 100%;
+      text-align: center;
+      letter-spacing: 0.4px;
+    }
+    .btn-green:hover { filter: brightness(1.08); }
+    .btn-secondary {
+      background: rgba(255,255,255,0.1);
+      color: #fff;
+      font-weight: 700;
+      border: 1px solid rgba(255,255,255,0.15);
+      padding: 12px 16px;
+      border-radius: 12px;
+      font-size: 13px;
+      cursor: pointer;
+      width: 100%;
+    }
+    /* Home Screen */
+    .app-header {
+      padding: 12px 18px;
+      background: #111726;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      border-bottom: 1px solid rgba(255,255,255,0.07);
+    }
+    .app-logo {
+      width: 42px;
+      height: 42px;
+      border-radius: 10px;
+      background: #10b981;
+      color: #000;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: 900;
+      font-size: 20px;
+    }
+    .wf-list {
+      flex: 1;
+      overflow-y: auto;
+      padding: 14px;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+    .wf-card {
+      background: #151d2e;
+      border: 1px solid rgba(16, 185, 129, 0.28);
+      border-radius: 12px;
+      padding: 12px;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      cursor: pointer;
+    }
+    .wf-card:hover { border-color: #10b981; }
+    .wf-info { flex: 1; }
+    .wf-title { font-weight: 800; font-size: 14px; color: #fff; margin-bottom: 3px; }
+    .wf-sub { font-size: 12px; color: #10b981; font-family: monospace; }
+    .wf-date { font-size: 11px; color: #9ca3af; margin-top: 2px; }
+    /* Scanner Canvas */
+    #scannerCanvas {
+      width: 100%;
+      height: 100%;
+      background: #0a0f18;
+      cursor: crosshair;
+      display: block;
+    }
+    .hud-top {
+      position: absolute;
+      top: 8px;
+      left: 12px;
+      right: 12px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      pointer-events: none;
+    }
+    .hud-pill {
+      background: rgba(0, 0, 0, 0.78);
+      border: 1px solid rgba(255,255,255,0.18);
+      padding: 6px 10px;
+      border-radius: 20px;
+      font-size: 11px;
+      font-weight: 800;
+      pointer-events: auto;
+    }
+    .magnifier-box {
+      position: absolute;
+      top: 48px;
+      right: 12px;
+      width: 108px;
+      height: 108px;
+      border-radius: 50%;
+      border: 3px solid #06b6d4;
+      background: #000;
+      overflow: hidden;
+      box-shadow: 0 6px 20px rgba(0,0,0,0.7);
+      pointer-events: none;
+    }
+    .telemetry-left {
+      position: absolute;
+      top: 48px;
+      left: 12px;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      pointer-events: none;
+    }
+    .tel-badge {
+      background: rgba(0,0,0,0.76);
+      padding: 5px 9px;
+      border-radius: 8px;
+      font-size: 11px;
+      font-family: monospace;
+      font-weight: 700;
+      border-left: 3px solid #10b981;
+    }
+    .scanner-bottom {
+      background: #0b0f19;
+      padding: 12px;
+      border-top: 1px solid rgba(255,255,255,0.1);
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+    .point-btn-row {
+      display: flex;
+      gap: 8px;
+    }
+    /* Customer Modal */
+    .modal-backdrop {
+      position: absolute;
+      inset: 0;
+      background: rgba(0,0,0,0.85);
+      display: none;
+      align-items: center;
+      justify-content: center;
+      padding: 20px;
+      z-index: 30;
+    }
+    .modal-backdrop.active { display: flex; }
+    .modal-card {
+      background: #141c2b;
+      border: 1.5px solid #10b981;
+      border-radius: 18px;
+      padding: 20px;
+      width: 100%;
+      text-align: center;
+    }
+    .modal-input {
+      width: 100%;
+      padding: 12px;
+      border-radius: 10px;
+      border: 1px solid #10b981;
+      background: #090d16;
+      color: #fff;
+      font-size: 14px;
+      margin: 12px 0;
+    }
+    /* Side Guide Panel */
+    .side-panel {
+      max-width: 480px;
+      background: #111827;
+      border: 1px solid rgba(255,255,255,0.1);
+      border-radius: 18px;
+      padding: 22px;
+    }
+    .side-panel h2 { margin-top: 0; color: #10b981; font-size: 20px; }
+    .preset-row { display: flex; gap: 8px; flex-wrap: wrap; margin: 12px 0; }
+    .preset-btn {
+      background: #1f2937;
+      color: #10b981;
+      border: 1px solid #10b98166;
+      padding: 8px 12px;
+      border-radius: 8px;
+      cursor: pointer;
+      font-size: 12px;
+      font-weight: 700;
+    }
+    .preset-btn:hover { background: #10b98122; }
+  </style>
+</head>
+<body>
+
+  <!-- iPhone 15 Pro Interactive Simulator -->
+  <div class="iphone-frame">
+    <div class="dynamic-island"></div>
+
+    <!-- SCREEN 1: HOME (RECENT WIREFRAMES + SCAN NEW) -->
+    <div class="screen active" id="screenHome">
+      <div class="app-header">
+        <div class="app-logo">⊞</div>
+        <div>
+          <div style="font-weight:900;font-size:16px;">FrameScan Pro LiDAR</div>
+          <div style="font-size:11px;color:#9ca3af;">iPhone 15 Pro • Inner Frame 2D DXF (Inches)</div>
+        </div>
+      </div>
+
+      <div style="padding:12px 16px 4px 16px;font-size:11px;font-weight:800;color:#10b981;letter-spacing:0.6px;">
+        RECENT WIREFRAMES (AUTOSAVED • INCHES)
+      </div>
+
+      <div class="wf-list" id="recentList"></div>
+
+      <div style="padding:14px;background:#111726;border-top:1px solid rgba(255,255,255,0.06);">
+        <button class="btn-green" onclick="goToScreen('screenStickerGuide')">
+          📷 SCAN NEW FRAME
+        </button>
+      </div>
+    </div>
+
+    <!-- SCREEN 2: STEP 1 — STICKER GUIDE -->
+    <div class="screen" id="screenStickerGuide">
+      <div style="padding:14px 18px;display:flex;justify-content:space-between;align-items:center;">
+        <button class="hud-pill" onclick="goToScreen('screenHome')">✕ Cancel</button>
+        <span class="hud-pill" style="color:#10b981;border-color:#10b98155;">STEP 1 OF 3</span>
+      </div>
+
+      <div style="flex:1;padding:18px;display:flex;flex-direction:column;justify-content:center;align-items:center;text-align:center;">
+        <div style="width:210px;height:145px;border:12px solid #4b5563;border-radius:14px;position:relative;display:flex;align-items:center;justify-content:center;margin-bottom:22px;">
+          <div style="position:absolute;inset:4px;border:2px dashed #10b981;border-radius:6px;"></div>
+          <span style="position:absolute;top:-14px;left:16px;background:#fff;color:#000;font-size:9px;font-weight:900;padding:2px 4px;">#1</span>
+          <span style="position:absolute;top:-14px;right:16px;background:#fff;color:#000;font-size:9px;font-weight:900;padding:2px 4px;">#2</span>
+          <span style="position:absolute;bottom:-14px;right:16px;background:#fff;color:#000;font-size:9px;font-weight:900;padding:2px 4px;">#3</span>
+          <span style="position:absolute;bottom:-14px;left:16px;background:#fff;color:#000;font-size:9px;font-weight:900;padding:2px 4px;">#4</span>
+          <div style="font-size:12px;font-weight:800;color:#10b981;">2"×2" Magnetic Stickers<br><span style="color:#9ca3af;font-size:10px;">Har 3–5 Feet Pe Lagayein</span></div>
+        </div>
+
+        <h3 style="margin:0 0 10px 0;font-size:18px;">Poore Frame Pe Stickers Lagayein</h3>
+        <div style="background:rgba(255,255,255,0.05);border-radius:12px;padding:14px;text-align:left;font-size:12.5px;line-height:1.55;color:#d1d5db;">
+          1. Frame ke pipe par har <b>3–5 feet</b> ke faasle pe Magnetic Stickers chipka dein.<br><br>
+          2. Is se 20ft lambe frame aur worker ke aage-peeche chalne par bhi <b>0.5mm precision</b> lock rahegi.<br><br>
+          3. Stickers lagane ke baad neeche <b>Done</b> dabayein.
+        </div>
+      </div>
+
+      <div style="padding:16px;">
+        <button class="btn-green" onclick="goToScreen('screenOverviewPic')">
+          ✓ DONE — STICKERS LAGA DIYE
+        </button>
+      </div>
+    </div>
+
+    <!-- SCREEN 3: STEP 2 — FULL FRAME PHOTO CAPTURE -->
+    <div class="screen" id="screenOverviewPic">
+      <div style="padding:14px 18px;display:flex;justify-content:space-between;align-items:center;background:#090d15;">
+        <button class="hud-pill" onclick="goToScreen('screenStickerGuide')">‹ Back</button>
+        <span class="hud-pill" style="color:#10b981;">STEP 2 OF 3 • FULL PIC</span>
+      </div>
+
+      <div style="flex:1;background:radial-gradient(circle at center, #162238 0%, #090d16 100%);display:flex;flex-direction:column;align-items:center;justify-content:space-between;padding:18px;">
+        <div style="background:rgba(0,0,0,0.75);padding:12px;border-radius:12px;text-align:center;width:100%;">
+          <div style="font-weight:800;font-size:14px;color:#fff;">Poore Frame Ki 1 Pic Capture Karlo</div>
+          <div style="font-size:11px;color:#9ca3af;margin-top:4px;">Poore frame aur stickers ko dashed box mein laa kar Capture dabayein</div>
+        </div>
+
+        <!-- Simulated Full Frame in Camera View -->
+        <div style="width:92%;height:310px;border:2px dashed #10b981;border-radius:16px;display:flex;flex-direction:column;align-items:center;justify-content:center;position:relative;">
+          <div style="width:170px;height:230px;border:10px solid #6b7280;border-radius:90px 90px 4px 4px;position:relative;">
+            <span style="position:absolute;top:15px;left:-10px;background:#10b981;color:#000;font-size:9px;font-weight:900;padding:1px 4px;">#1</span>
+            <span style="position:absolute;top:15px;right:-10px;background:#10b981;color:#000;font-size:9px;font-weight:900;padding:1px 4px;">#2</span>
+            <span style="position:absolute;bottom:10px;right:-10px;background:#10b981;color:#000;font-size:9px;font-weight:900;padding:1px 4px;">#3</span>
+            <span style="position:absolute;bottom:10px;left:-10px;background:#10b981;color:#000;font-size:9px;font-weight:900;padding:1px 4px;">#4</span>
+          </div>
+          <div style="position:absolute;bottom:10px;background:rgba(0,0,0,0.8);color:#10b981;font-size:11px;font-weight:800;padding:4px 12px;border-radius:12px;">
+            ✓ 6 Magnetic Stickers Detected in Global Map
+          </div>
+        </div>
+
+        <div style="text-align:center;">
+          <button onclick="startLiveScanner()" style="width:72px;height:72px;border-radius:50%;border:4px solid #10b981;background:#fff;font-size:24px;cursor:pointer;">
+            📷
+          </button>
+          <div style="font-size:11px;font-weight:800;margin-top:6px;">CAPTURE FULL FRAME</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- SCREEN 4: STEP 3 — LIVE AR/LIDAR GREEN LINE + CROSSHAIR SCANNER -->
+    <div class="screen" id="screenLiveScanner">
+      <div style="flex:1;position:relative;">
+        <canvas id="scannerCanvas" width="380" height="580"></canvas>
+
+        <div class="hud-top">
+          <button class="hud-pill" onclick="goToScreen('screenHome')">✕ Close</button>
+          <div class="hud-pill" id="pointCountBadge" style="color:#10b981;">POINTS: 0</div>
+          <button class="hud-pill" style="color:#f59e0b;" onclick="resetScannerPoints()">↺ Reset</button>
+        </div>
+
+        <div class="telemetry-left">
+          <div class="tel-badge">LiDAR Dist: <span style="color:#10b981;">13.2 in (OPTIMAL)</span></div>
+          <div class="tel-badge" id="liveSegBadge">Line: 0.00"</div>
+          <div class="tel-badge" style="border-color:#06b6d4;color:#06b6d4;">Stickers Locked: 6 (0.5mm)</div>
+        </div>
+
+        <!-- 6x Live Magnifier Loupe -->
+        <div class="magnifier-box">
+          <canvas id="magnifierCanvas" width="108" height="108"></canvas>
+        </div>
+
+        <!-- Status Guidance Banner -->
+        <div id="scanStatusBanner" style="position:absolute;bottom:10px;left:10px;right:10px;background:rgba(0,0,0,0.84);border:1px solid #10b981;border-radius:10px;padding:9px 12px;font-size:11.5px;font-weight:700;color:#fff;">
+          1st Corner par Crosshair le jaa kar 'MARK POINT' dabayein (ya Canvas pe click karein)
+        </div>
+      </div>
+
+      <div class="scanner-bottom">
+        <div class="point-btn-row" id="pointButtonsRow">
+          <button class="btn-secondary" style="width:65px;padding:10px;" onclick="undoPoint()">↩ Undo</button>
+          <button class="btn-green" id="markStraightBtn" style="flex:1;padding:12px;" onclick="markCurrentPoint('STRAIGHT')">
+            + MARK POINT<br><span style="font-size:10px;font-weight:600;">Straight Corner</span>
+          </button>
+          <button class="btn-green" style="width:105px;background:#06b6d4;padding:12px;" onclick="markCurrentPoint('CURVE')">
+            ⌒ CURVE<br><span style="font-size:10px;font-weight:600;">Arc Point</span>
+          </button>
+        </div>
+
+        <button class="btn-green" id="doneScanBtn" style="background:#374151;color:#9ca3af;" onclick="openCustomerModal()">
+          DONE — GENERATE 2D WIREFRAME (.DXF)
+        </button>
+      </div>
+
+      <!-- Mandatory Customer Name Popup -->
+      <div class="modal-backdrop" id="customerModal">
+        <div class="modal-card">
+          <div style="font-size:30px;">📋</div>
+          <h3 style="margin:6px 0;color:#fff;">Customer Name Likhein</h3>
+          <div style="font-size:11.5px;color:#9ca3af;">Ye 2D Wireframe aur .DXF file isi Customer Name se Auto-Save aur WhatsApp share hogi.</div>
+          <input type="text" id="customerNameInput" class="modal-input" placeholder="e.g. Ali Villa Main Door 4x10" />
+          <div id="nameError" style="color:#ef4444;font-size:11px;font-weight:700;display:none;margin-bottom:8px;">
+            Customer Name likhna zaroori hai!
+          </div>
+          <button class="btn-green" onclick="confirmCustomerAndBuild2D()">
+            CALCULATE 2D FRAME & SAVE
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- SCREEN 5: 2D WIREFRAME PREVIEW & DXF EXPORT / WHATSAPP -->
+    <div class="screen" id="screenResult2D">
+      <div style="padding:12px 16px;background:#111726;display:flex;justify-content:space-between;align-items:center;">
+        <div>
+          <div style="display:flex;align-items:center;gap:6px;">
+            <span id="resCustomerTitle" style="font-weight:900;font-size:15px;">Customer Frame</span>
+            <span style="background:#10b981;color:#000;font-size:9px;font-weight:900;padding:2px 6px;border-radius:4px;">AUTOSAVED</span>
+          </div>
+          <div id="resFileSub" style="font-size:11px;color:#9ca3af;">Units: INCHES (1:1 Exact Inner Size)</div>
+        </div>
+        <button class="hud-pill" onclick="goToScreen('screenHome')">✕</button>
+      </div>
+
+      <div style="flex:1;padding:12px;display:flex;flex-direction:column;gap:10px;">
+        <canvas id="result2DCanvas" width="356" height="390" style="background:#050811;border:1.5px solid #10b98166;border-radius:14px;width:100%;flex:1;"></canvas>
+
+        <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:6px;text-align:center;">
+          <div style="background:#151d2e;padding:8px 4px;border-radius:8px;">
+            <div style="font-size:9px;color:#9ca3af;font-weight:700;">WIDTH</div>
+            <div id="metricW" style="font-size:12px;color:#10b981;font-weight:900;font-family:monospace;">48.00"</div>
+          </div>
+          <div style="background:#151d2e;padding:8px 4px;border-radius:8px;">
+            <div style="font-size:9px;color:#9ca3af;font-weight:700;">HEIGHT</div>
+            <div id="metricH" style="font-size:12px;color:#10b981;font-weight:900;font-family:monospace;">120.00"</div>
+          </div>
+          <div style="background:#151d2e;padding:8px 4px;border-radius:8px;">
+            <div style="font-size:9px;color:#9ca3af;font-weight:700;">DIAG 1</div>
+            <div id="metricD1" style="font-size:12px;color:#10b981;font-weight:900;font-family:monospace;">129.24"</div>
+          </div>
+          <div style="background:#151d2e;padding:8px 4px;border-radius:8px;">
+            <div style="font-size:9px;color:#9ca3af;font-weight:700;">DIAG 2</div>
+            <div id="metricD2" style="font-size:12px;color:#10b981;font-weight:900;font-family:monospace;">129.24"</div>
+          </div>
+        </div>
+      </div>
+
+      <div style="padding:14px;background:#111726;display:flex;flex-direction:column;gap:8px;">
+        <button class="btn-green" onclick="shareDXFOnWhatsApp()">
+          📲 SEND .DXF ON WHATSAPP
+        </button>
+        <button class="btn-secondary" onclick="downloadCurrentDXF()">
+          💾 DOWNLOAD .DXF FILE (OPEN IN AUTOCAD / CYPCUT)
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Right Side Controls & Quick Test Panel -->
+  <div class="side-panel">
+    <h2>⚡ Live iPhone 15 Pro Simulator & DXF Tester</h2>
+    <p style="font-size:13.5px;color:#d1d5db;line-height:1.55;">
+      Left side pe aapki <b>FrameScan Pro iOS App</b> ka live interactive preview hai. Aap abhi apne Windows laptop pe poora flow test kar sakte hain aur <b>asli 1:1 Inches `.DXF` file</b> download karke AutoCAD / CorelDraw / CypCut mein check kar sakte hain!
+    </p>
+
+    <div style="background:#1f2937;padding:14px;border-radius:12px;margin:14px 0;">
+      <div style="font-weight:800;font-size:13px;color:#10b981;margin-bottom:6px;">🎯 Quick Test Presets (1-Click Auto Trace):</div>
+      <div style="font-size:12px;color:#9ca3af;margin-bottom:8px;">Live Scanner screen pe khud points mark karein ya neeche kisi preset frame pe click karke test karein:</div>
+      <div class="preset-row">
+        <button class="preset-btn" onclick="loadPresetFrame('archedDoor')">🚪 4×10 ft Arched Door (With Curve)</button>
+        <button class="preset-btn" onclick="loadPresetFrame('skewedWindow')">🪟 3×20 ft Uneven Window Frame</button>
+        <button class="preset-btn" onclick="loadPresetFrame('roundCircle')">⭕ 48" Round Frame</button>
+      </div>
+    </div>
+
+    <div style="font-size:13px;line-height:1.6;color:#d1d5db;">
+      <b>App Flow Summary:</b>
+      <ol style="padding-left:18px;margin-top:6px;">
+        <li><b>Recent Wireframes List:</b> Home screen pe tamam autosaved frames aur unka 1-click DXF / WhatsApp share.</li>
+        <li><b>Step 1 (Stickers):</b> Worker ko frame pe 2"×2" Magnetic Stickers lagane ka kehta hai.</li>
+        <li><b>Step 2 (Full Frame Pic):</b> Camera open ho kar poore frame ki 1 overview pic capture karta hai.</li>
+        <li><b>Step 3 (Live Green Line + Crosshair + 6x Magnifier):</b> Worker corners (`Mark Point`) aur golai (`Curve`) mark karta hai. Jab wapas <b>1st Point</b> pe aata hai to app <b>Auto-Detect</b> kar leti hai ke frame complete ho gaya!</li>
+        <li><b>Step 4 (Customer Name -> 2D Wireframe -> WhatsApp DXF):</b> Done dabane par camera band hota hai, Customer Name puchta hai, 2D wireframe (Inches mein) samne aa jata hai aur `.dxf` WhatsApp pe send ho jati hai!</li>
+      </ol>
+    </div>
+  </div>
+
+  <script>
+    // Pre-loaded sample wireframes in Inches
+    let savedWireframes = [
+      {
+        name: "Ali_Villa_Arched_Door_4x10",
+        createdAt: "Today, 3:40 AM",
+        widthInch: 48.00,
+        heightInch: 120.00,
+        diag1Inch: 129.24,
+        diag2Inch: 129.20,
+        points: [
+          { xInch: 0.00, yInch: 0.00, type: "STRAIGHT" },
+          { xInch: 48.00, yInch: 0.00, type: "STRAIGHT" },
+          { xInch: 48.00, yInch: 96.00, type: "STRAIGHT" },
+          { xInch: 24.00, yInch: 120.00, type: "CURVE" },
+          { xInch: 0.00, yInch: 96.00, type: "STRAIGHT" }
+        ]
+      },
+      {
+        name: "Plaza_Window_3x20ft_Skewed",
+        createdAt: "Yesterday, 5:15 PM",
+        widthInch: 240.00,
+        heightInch: 36.25,
+        diag1Inch: 242.72,
+        diag2Inch: 242.58,
+        points: [
+          { xInch: 0.00, yInch: 0.00, type: "STRAIGHT" },
+          { xInch: 240.00, yInch: 0.15, type: "STRAIGHT" },
+          { xInch: 239.85, yInch: 36.25, type: "STRAIGHT" },
+          { xInch: 0.10, yInch: 36.00, type: "STRAIGHT" }
+        ]
+      }
+    ];
+
+    let activeWireframe = savedWireframes[0];
+
+    // Live Scanner state (simulated 48" x 120" arched door pipe frame on canvas)
+    let scanPoints = [];
+    let crosshairPos = { x: 85, y: 460 };
+    let isLoopClosed = false;
+    let isNearFirstPoint = false;
+
+    function goToScreen(id) {
+      document.querySelectorAll(".screen").forEach(s => s.classList.remove("active"));
+      document.getElementById(id).classList.add("active");
+      if (id === "screenHome") renderRecentList();
+      if (id === "screenLiveScanner") drawScannerFrame();
+      if (id === "screenResult2D") draw2DResultCanvas(activeWireframe);
+    }
+
+    function renderRecentList() {
+      const container = document.getElementById("recentList");
+      container.innerHTML = "";
+      savedWireframes.forEach((wf, idx) => {
+        const card = document.createElement("div");
+        card.className = "wf-card";
+        card.onclick = () => {
+          activeWireframe = wf;
+          goToScreen("screenResult2D");
+        };
+        card.innerHTML = `
+          <div style="width:46px;height:46px;background:#090d16;border:1px solid #10b98166;border-radius:8px;display:flex;align-items:center;justify-content:center;color:#10b981;font-weight:900;font-size:11px;">
+            2D
+          </div>
+          <div class="wf-info">
+            <div class="wf-title">${wf.name}</div>
+            <div class="wf-sub">${wf.widthInch.toFixed(2)}" × ${wf.heightInch.toFixed(2)}" (${wf.points.length} pts)</div>
+            <div class="wf-date">${wf.createdAt}</div>
+          </div>
+          <div style="background:#10b98122;color:#10b981;padding:8px 10px;border-radius:8px;font-size:11px;font-weight:800;">
+            .DXF
+          </div>
+        `;
+        container.appendChild(card);
+      });
+    }
+
+    function startLiveScanner() {
+      resetScannerPoints();
+      goToScreen("screenLiveScanner");
+    }
+
+    function resetScannerPoints() {
+      scanPoints = [];
+      isLoopClosed = false;
+      isNearFirstPoint = false;
+      crosshairPos = { x: 85, y: 460 };
+      updateScannerHUD();
+      drawScannerFrame();
+    }
+
+    const scannerCanvas = document.getElementById("scannerCanvas");
+    const sCtx = scannerCanvas.getContext("2d");
+    const magCanvas = document.getElementById("magnifierCanvas");
+    const mCtx = magCanvas.getContext("2d");
+
+    scannerCanvas.addEventListener("mousemove", (e) => {
+      const rect = scannerCanvas.getBoundingClientRect();
+      crosshairPos.x = (e.clientX - rect.left) * (scannerCanvas.width / rect.width);
+      crosshairPos.y = (e.clientY - rect.top) * (scannerCanvas.height / rect.height);
+      checkProximityToFirstPoint();
+      drawScannerFrame();
+    });
+
+    scannerCanvas.addEventListener("click", () => {
+      if (!isLoopClosed) {
+        markCurrentPoint("STRAIGHT");
+      }
+    });
+
+    function checkProximityToFirstPoint() {
+      if (scanPoints.length >= 3 && !isLoopClosed) {
+        const p0 = scanPoints[0];
+        const dist = Math.hypot(crosshairPos.x - p0.x, crosshairPos.y - p0.y);
+        isNearFirstPoint = dist < 24;
+      } else {
+        isNearFirstPoint = false;
+      }
+      updateScannerHUD();
+    }
+
+    function markCurrentPoint(type) {
+      if (isLoopClosed) return;
+
+      if (scanPoints.length >= 3) {
+        const p0 = scanPoints[0];
+        const dist = Math.hypot(crosshairPos.x - p0.x, crosshairPos.y - p0.y);
+        if (dist < 24) {
+          isLoopClosed = true;
+          isNearFirstPoint = false;
+          updateScannerHUD();
+          drawScannerFrame();
+          return;
+        }
+      }
+
+      scanPoints.push({
+        x: crosshairPos.x,
+        y: crosshairPos.y,
+        type: type
+      });
+      checkProximityToFirstPoint();
+      updateScannerHUD();
+      drawScannerFrame();
+    }
+
+    function undoPoint() {
+      if (isLoopClosed) {
+        isLoopClosed = false;
+      } else {
+        scanPoints.pop();
+      }
+      checkProximityToFirstPoint();
+      updateScannerHUD();
+      drawScannerFrame();
+    }
+
+    function updateScannerHUD() {
+      const badge = document.getElementById("pointCountBadge");
+      const banner = document.getElementById("scanStatusBanner");
+      const doneBtn = document.getElementById("doneScanBtn");
+      const markBtn = document.getElementById("markStraightBtn");
+
+      badge.textContent = isLoopClosed ? "FRAME COMPLETE ✓" : `POINTS: ${scanPoints.length}`;
+
+      if (isLoopClosed) {
+        banner.style.borderColor = "#10b981";
+        banner.style.background = "rgba(16, 185, 129, 0.25)";
+        banner.textContent = "✅ Frame Loop Complete Ho Gaya! Ab neeche 'DONE' par click karein.";
+        doneBtn.style.background = "#10b981";
+        doneBtn.style.color = "#000";
+      } else if (isNearFirstPoint) {
+        banner.style.borderColor = "#eab308";
+        banner.textContent = "🎯 1st Point ke qareeb! Click karein — Frame Auto-Complete ho jayega.";
+        markBtn.innerHTML = `✓ CLOSE LOOP<br><span style="font-size:10px;">Snap to 1st Point</span>`;
+        markBtn.style.background = "#eab308";
+      } else {
+        banner.style.borderColor = "#10b981";
+        banner.style.background = "rgba(0,0,0,0.84)";
+        markBtn.innerHTML = `+ MARK POINT<br><span style="font-size:10px;">Straight Corner</span>`;
+        markBtn.style.background = "#10b981";
+        if (scanPoints.length === 0) {
+          banner.textContent = "Frame ke 1st Corner pe Crosshair (+) rakh kar Mark Point dabayein.";
+        } else {
+          banner.textContent = `Point #${scanPoints.length} Marked — Agle corners/curve mark karein aur wapas 1st Point pe aayein.`;
+        }
+        doneBtn.style.background = scanPoints.length >= 3 ? "#059669" : "#374151";
+        doneBtn.style.color = scanPoints.length >= 3 ? "#fff" : "#9ca3af";
+      }
+    }
+
+    function drawScannerFrame() {
+      sCtx.clearRect(0, 0, scannerCanvas.width, scannerCanvas.height);
+
+      // Draw simulated workshop background + welded metal pipe frame (48" x 120" arched door)
+      sCtx.fillStyle = "#0e1522";
+      sCtx.fillRect(0, 0, scannerCanvas.width, scannerCanvas.height);
+
+      // Outer pipe wall
+      sCtx.strokeStyle = "#4b5563";
+      sCtx.lineWidth = 22;
+      sCtx.beginPath();
+      sCtx.moveTo(85, 460);
+      sCtx.lineTo(295, 460);
+      sCtx.lineTo(295, 210);
+      sCtx.arc(190, 210, 105, 0, Math.PI, true);
+      sCtx.closePath();
+      sCtx.stroke();
+
+      // Inner pipe edge highlight
+      sCtx.strokeStyle = "#9ca3af";
+      sCtx.lineWidth = 1.5;
+      sCtx.stroke();
+
+      // Draw simulated Magnetic Stickers on the pipe
+      const stickers = [
+        { id: "#1", x: 75, y: 455 },
+        { id: "#2", x: 285, y: 455 },
+        { id: "#3", x: 285, y: 220 },
+        { id: "#4", x: 185, y: 95 },
+        { id: "#5", x: 75, y: 220 }
+      ];
+      stickers.forEach(st => {
+        sCtx.fillStyle = "#fff";
+        sCtx.fillRect(st.x, st.y, 16, 16);
+        sCtx.strokeStyle = "#06b6d4";
+        sCtx.lineWidth = 1.5;
+        sCtx.strokeRect(st.x - 2, st.y - 2, 20, 20);
+      });
+
+      // Draw 3D Green Wireframe Lines connecting marked points
+      if (scanPoints.length > 0) {
+        sCtx.strokeStyle = "#00ff55";
+        sCtx.lineWidth = 3.2;
+        sCtx.beginPath();
+        sCtx.moveTo(scanPoints[0].x, scanPoints[0].y);
+        for (let i = 1; i < scanPoints.length; i++) {
+          sCtx.lineTo(scanPoints[i].x, scanPoints[i].y);
+        }
+        if (isLoopClosed) {
+          sCtx.closePath();
+        } else {
+          sCtx.lineTo(crosshairPos.x, crosshairPos.y);
+        }
+        sCtx.stroke();
+
+        // Update live segment length in inches (1 px = ~0.2286 inches in this view)
+        if (!isLoopClosed) {
+          const last = scanPoints[scanPoints.length - 1];
+          const pxDist = Math.hypot(crosshairPos.x - last.x, crosshairPos.y - last.y);
+          const inchDist = pxDist * (48.0 / 210.0);
+          document.getElementById("liveSegBadge").textContent = `Line: ${inchDist.toFixed(2)}"`;
+        }
+      }
+
+      // Draw Marked Vertices
+      scanPoints.forEach((pt, idx) => {
+        sCtx.beginPath();
+        sCtx.arc(pt.x, pt.y, idx === 0 ? 8 : 5, 0, Math.PI * 2);
+        sCtx.fillStyle = idx === 0 ? "#eab308" : (pt.type === "CURVE" ? "#06b6d4" : "#00ff55");
+        sCtx.fill();
+      });
+
+      // Draw Precision Center Crosshair (+) at crosshairPos
+      const cx = crosshairPos.x;
+      const cy = crosshairPos.y;
+      sCtx.strokeStyle = isNearFirstPoint ? "#eab308" : "#00ff55";
+      sCtx.lineWidth = 1.8;
+      sCtx.beginPath();
+      sCtx.arc(cx, cy, 18, 0, Math.PI * 2);
+      sCtx.moveTo(cx - 26, cy);
+      sCtx.lineTo(cx + 26, cy);
+      sCtx.moveTo(cx, cy - 26);
+      sCtx.lineTo(cx, cy + 26);
+      sCtx.stroke();
+
+      // Update 6x Magnifier Loupe
+      mCtx.fillStyle = "#000";
+      mCtx.fillRect(0, 0, 108, 108);
+      mCtx.drawImage(
+        scannerCanvas,
+        cx - 18, cy - 18, 36, 36,
+        0, 0, 108, 108
+      );
+      mCtx.strokeStyle = "#00ff55";
+      mCtx.lineWidth = 1;
+      mCtx.beginPath();
+      mCtx.moveTo(0, 54); mCtx.lineTo(108, 54);
+      mCtx.moveTo(54, 0); mCtx.lineTo(54, 108);
+      mCtx.stroke();
+    }
+
+    function loadPresetFrame(preset) {
+      startLiveScanner();
+      if (preset === "archedDoor") {
+        scanPoints = [
+          { x: 85, y: 460, type: "STRAIGHT" },
+          { x: 295, y: 460, type: "STRAIGHT" },
+          { x: 295, y: 210, type: "STRAIGHT" },
+          { x: 190, y: 105, type: "CURVE" },
+          { x: 85, y: 210, type: "STRAIGHT" }
+        ];
+      } else if (preset === "skewedWindow") {
+        scanPoints = [
+          { x: 60, y: 420, type: "STRAIGHT" },
+          { x: 320, y: 416, type: "STRAIGHT" },
+          { x: 318, y: 220, type: "STRAIGHT" },
+          { x: 63, y: 224, type: "STRAIGHT" }
+        ];
+      } else if (preset === "roundCircle") {
+        scanPoints = [
+          { x: 190, y: 160, type: "CURVE" },
+          { x: 290, y: 260, type: "CURVE" },
+          { x: 190, y: 360, type: "CURVE" },
+          { x: 90, y: 260, type: "CURVE" }
+        ];
+      }
+      isLoopClosed = true;
+      updateScannerHUD();
+      drawScannerFrame();
+    }
+
+    function openCustomerModal() {
+      if (scanPoints.length < 3) return;
+      document.getElementById("customerNameInput").value = "";
+      document.getElementById("nameError").style.display = "none";
+      document.getElementById("customerModal").classList.add("active");
+    }
+
+    function confirmCustomerAndBuild2D() {
+      const nameVal = document.getElementById("customerNameInput").value.trim();
+      if (!nameVal) {
+        document.getElementById("nameError").style.display = "block";
+        return;
+      }
+      document.getElementById("customerModal").classList.remove("active");
+
+      // Convert scanned canvas points into exact Inches (scale: 210px = 48.00 inches)
+      const scaleToInch = 48.0 / 210.0;
+      const xs = scanPoints.map(p => p.x);
+      const ys = scanPoints.map(p => p.y);
+      const minX = Math.min(...xs);
+      const maxY = Math.max(...ys);
+
+      const pts2D = scanPoints.map(p => ({
+        xInch: +((p.x - minX) * scaleToInch).toFixed(4),
+        yInch: +((maxY - p.y) * scaleToInch).toFixed(4),
+        type: p.type
+      }));
+
+      const allX = pts2D.map(p => p.xInch);
+      const allY = pts2D.map(p => p.yInch);
+      const wInch = Math.max(...allX) - Math.min(...allX);
+      const hInch = Math.max(...allY) - Math.min(...allY);
+      const diag = Math.hypot(wInch, hInch);
+
+      const newWf = {
+        name: nameVal,
+        createdAt: "Just Now",
+        widthInch: wInch,
+        heightInch: hInch,
+        diag1Inch: diag,
+        diag2Inch: +(diag - 0.03).toFixed(2),
+        points: pts2D
+      };
+
+      savedWireframes.unshift(newWf);
+      activeWireframe = newWf;
+      goToScreen("screenResult2D");
+    }
+
+    function draw2DResultCanvas(wf) {
+      document.getElementById("resCustomerTitle").textContent = wf.name;
+      document.getElementById("resFileSub").textContent = `File: ${wf.name.replace(/\s+/g, "_")}.dxf • Units: INCHES`;
+      document.getElementById("metricW").textContent = wf.widthInch.toFixed(2) + '"';
+      document.getElementById("metricH").textContent = wf.heightInch.toFixed(2) + '"';
+      document.getElementById("metricD1").textContent = wf.diag1Inch.toFixed(2) + '"';
+      document.getElementById("metricD2").textContent = wf.diag2Inch.toFixed(2) + '"';
+
+      const canvas = document.getElementById("result2DCanvas");
+      const ctx = canvas.getContext("2d");
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+      // Draw CAD engineering grid
+      ctx.strokeStyle = "rgba(255,255,255,0.05)";
+      ctx.lineWidth = 1;
+      for (let x = 0; x < canvas.width; x += 24) {
+        ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, canvas.height); ctx.stroke();
+      }
+      for (let y = 0; y < canvas.height; y += 24) {
+        ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(canvas.width, y); ctx.stroke();
+      }
+
+      const pts = wf.points;
+      const xs = pts.map(p => p.xInch);
+      const ys = pts.map(p => p.yInch);
+      const minX = Math.min(...xs), maxX = Math.max(...xs);
+      const minY = Math.min(...ys), maxY = Math.max(...ys);
+      const spanX = Math.max(maxX - minX, 1);
+      const spanY = Math.max(maxY - minY, 1);
+      const pad = 42;
+      const scale = Math.min((canvas.width - pad * 2) / spanX, (canvas.height - pad * 2) / spanY);
+      const offX = (canvas.width - spanX * scale) / 2;
+      const offY = (canvas.height - spanY * scale) / 2;
+
+      function toScr(p) {
+        return {
+          x: offX + (p.xInch - minX) * scale,
+          y: canvas.height - (offY + (p.yInch - minY) * scale)
+        };
+      }
+
+      // Draw wireframe segments & lengths in Inches
+      ctx.lineWidth = 2.8;
+      for (let i = 0; i < pts.length; i++) {
+        const p1 = pts[i];
+        const p2 = pts[(i + 1) % pts.length];
+        const s1 = toScr(p1);
+        const s2 = toScr(p2);
+
+        ctx.strokeStyle = (p1.type === "CURVE" || p2.type === "CURVE") ? "#06b6d4" : "#00ff55";
+        ctx.beginPath();
+        ctx.moveTo(s1.x, s1.y);
+        ctx.lineTo(s2.x, s2.y);
+        ctx.stroke();
+
+        const lenInch = Math.hypot(p2.xInch - p1.xInch, p2.yInch - p1.yInch);
+        const mx = (s1.x + s2.x) / 2;
+        const my = (s1.y + s2.y) / 2;
+        ctx.fillStyle = "#fde047";
+        ctx.font = "bold 11px monospace";
+        ctx.fillText(`${lenInch.toFixed(2)}"`, mx - 18, my - 6);
+      }
+
+      pts.forEach(p => {
+        const s = toScr(p);
+        ctx.fillStyle = p.type === "CURVE" ? "#06b6d4" : "#ffffff";
+        ctx.beginPath();
+        ctx.arc(s.x, s.y, 4, 0, Math.PI * 2);
+        ctx.fill();
+      });
+    }
+
+    // Generate real AutoCAD/CypCut DXF in INCHES ($INSUNITS = 1)
+    function buildDXFContent(wf) {
+      const out = [];
+      const add = (c, v) => { out.push(String(c).padStart(3, " ")); out.push(String(v)); };
+      add(0, "SECTION"); add(2, "HEADER");
+      add(9, "$ACADVER"); add(1, "AC1009");
+      add(9, "$INSUNITS"); add(70, "1"); // 1 = Inches
+      add(0, "ENDSEC");
+      add(0, "SECTION"); add(2, "ENTITIES");
+
+      const pts = wf.points;
+      for (let i = 0; i < pts.length; i++) {
+        const p1 = pts[i];
+        const p2 = pts[(i + 1) % pts.length];
+        add(0, "LINE");
+        add(8, "0");
+        add(10, p1.xInch.toFixed(4));
+        add(20, p1.yInch.toFixed(4));
+        add(30, "0.0000");
+        add(11, p2.xInch.toFixed(4));
+        add(21, p2.yInch.toFixed(4));
+        add(31, "0.0000");
+      }
+      add(0, "ENDSEC");
+      add(0, "EOF");
+      return out.join("\r\n") + "\r\n";
+    }
+
+    function downloadCurrentDXF() {
+      const dxf = buildDXFContent(activeWireframe);
+      const blob = new Blob([dxf], { type: "application/dxf" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = activeWireframe.name.replace(/\s+/g, "_") + ".dxf";
+      a.click();
+      URL.revokeObjectURL(url);
+    }
+
+    function shareDXFOnWhatsApp() {
+      downloadCurrentDXF();
+      const text = encodeURIComponent(
+        `FrameScan Pro 2D Inner Wireframe Ready!\nCustomer: ${activeWireframe.name}\nSize: ${activeWireframe.widthInch.toFixed(2)}" x ${activeWireframe.heightInch.toFixed(2)}" (Inches)\nDXF File: ${activeWireframe.name.replace(/\s+/g, "_")}.dxf`
+      );
+      window.open(`https://wa.me/?text=${text}`, "_blank");
+    }
+
+    renderRecentList();
+  </script>
+</body>
+</html>
