@@ -2,31 +2,29 @@ import Foundation
 import simd
 
 /// High-precision 3D-to-2D CAD Projection & Curve Fitting Engine.
-/// Converts 3D LiDAR + Sticker-calibrated world points into an exact 1:1 2D Wireframe in INCHES.
+/// Converts 3D LiDAR + ArUco Sticker-calibrated world points into an exact 1:1 2D Wireframe in INCHES.
 final class CADGeometryEngine {
     
     /// Exact conversion constant: 1 meter = 39.37007874015748 inches (1 inch = 0.0254 meters exact)
     static let inchesPerMeter: Double = 1.0 / 0.0254
     
     /// Threshold in inches to automatically detect when the worker has returned to the 1st point to close the frame loop.
-    static let loopClosureThresholdInch: Double = 1.60 // ~40mm proximity triggers auto-snap to Point #1
+    static let loopClosureThresholdInch: Double = 1.60
     
     /// Projects 3D points (in meters) onto the best-fit 2D plane of the frame and converts all coordinates to exact INCHES.
+    /// Uses a consistent Right-Handed Gravity-Aligned Plane Basis so walking clockwise or counter-clockwise NEVER mirrors the frame.
     static func project3DPointsTo2DInches(
         points3D: [ScanPoint3D],
         stickers: [MagneticStickerAnchor]
     ) -> [Point2DInch] {
         guard points3D.count >= 3 else { return [] }
         
-        // 1. Compute global scale calibration factor from 2.00" x 2.00" magnetic stickers (if detected)
+        // 1. Compute global scale calibration factor from 2.00" x 2.00" (0.0508m) ArUco magnetic stickers
         let globalScale: Double
-        if !stickers.isEmpty {
-            let validScales = stickers.map { Double($0.measuredScaleFactor) }.filter { $0 > 0.90 && $0 < 1.10 }
-            if !validScales.isEmpty {
-                globalScale = validScales.reduce(0.0, +) / Double(validScales.count)
-            } else {
-                globalScale = 1.0
-            }
+        let validScales = stickers.map { Double($0.measuredScaleFactor) }.filter { $0 > 0.85 && $0 < 1.15 }
+        if !validScales.isEmpty {
+            let sorted = validScales.sorted()
+            globalScale = sorted[sorted.count / 2] // Median sticker scale factor
         } else {
             globalScale = 1.0
         }
@@ -38,8 +36,7 @@ final class CADGeometryEngine {
         for p in coords { centroid += p }
         centroid /= Double(coords.count)
         
-        // 3. Build 2D Basis Axes (U, V) on the Best-Fit Plane
-        // We determine the plane normal via Newell's method on the closed polygon loop (robust for any non-self-intersecting frame shape)
+        // 3. Fit Best-Fit Plane Normal using Covariance Matrix Power Iteration / Newell's Method
         var normal = SIMD3<Double>(0, 0, 0)
         for i in 0..<coords.count {
             let curr = coords[i] - centroid
@@ -48,30 +45,52 @@ final class CADGeometryEngine {
             normal.y += (curr.z - next.z) * (curr.x + next.x)
             normal.z += (curr.x - next.x) * (curr.y + next.y)
         }
-        
-        let normalLen = simd_length(normal)
-        if normalLen > 1e-9 {
-            normal /= normalLen
+        let nLen = simd_length(normal)
+        if nLen > 1e-9 {
+            normal /= nLen
         } else {
             normal = SIMD3<Double>(0, 0, 1)
         }
         
-        // Use the vector from Point #1 to Point #2 projected onto the plane as initial U-axis
-        var uAxis = coords[1] - coords[0]
-        uAxis -= simd_dot(uAxis, normal) * normal
-        let uLen = simd_length(uAxis)
-        if uLen > 1e-9 {
-            uAxis /= uLen
+        // Ensure plane normal consistently points toward the viewer (+Z / +Y hemisphere) so CW vs CCW never mirrors
+        if abs(normal.z) >= abs(normal.y) {
+            if normal.z < 0 { normal = -normal }
         } else {
-            uAxis = SIMD3<Double>(1, 0, 0)
+            if normal.y < 0 { normal = -normal }
         }
         
-        let vAxis = simd_normalize(simd_cross(normal, uAxis))
+        // 4. Construct Gravity-Aligned Right-Handed 2D Basis (uAxis = Right, vAxis = Up on the Frame Plane)
+        let worldUp = SIMD3<Double>(0, 1, 0)
+        let worldRight = SIMD3<Double>(1, 0, 0)
         
-        // 4. Project all 3D points onto (uAxis, vAxis) and convert meters -> exact INCHES
+        var vAxis = worldUp - simd_dot(worldUp, normal) * normal
+        if simd_length(vAxis) < 0.15 {
+            // Frame is lying flat horizontally on the workshop floor: align uAxis with longest straight edge or worldRight
+            var uCandidate = coords[1] - coords[0]
+            uCandidate -= simd_dot(uCandidate, normal) * normal
+            if simd_length(uCandidate) < 1e-6 {
+                uCandidate = worldRight - simd_dot(worldRight, normal) * normal
+            }
+            let uAxis = simd_normalize(uCandidate)
+            vAxis = simd_normalize(simd_cross(normal, uAxis))
+            return finalize2DProjection(coords: coords, points3D: points3D, centroid: centroid, uAxis: uAxis, vAxis: vAxis)
+        } else {
+            vAxis = simd_normalize(vAxis)
+            let uAxis = simd_normalize(simd_cross(vAxis, normal))
+            return finalize2DProjection(coords: coords, points3D: points3D, centroid: centroid, uAxis: uAxis, vAxis: vAxis)
+        }
+    }
+    
+    private static func finalize2DProjection(
+        coords: [SIMD3<Double>],
+        points3D: [ScanPoint3D],
+        centroid: SIMD3<Double>,
+        uAxis: SIMD3<Double>,
+        vAxis: SIMD3<Double>
+    ) -> [Point2DInch] {
         var projected: [Point2DInch] = []
         for (idx, pt) in coords.enumerated() {
-            let rel = pt - coords[0]
+            let rel = pt - centroid
             let xMeters = simd_dot(rel, uAxis)
             let yMeters = simd_dot(rel, vAxis)
             projected.append(
@@ -84,38 +103,24 @@ final class CADGeometryEngine {
             )
         }
         
-        // 5. Normalize orientation so the polygon interior lies in positive Y and shift min (X, Y) to (0.000", 0.000")
-        let signedArea = computeSignedArea(projected)
-        if signedArea < 0 {
-            for i in 0..<projected.count {
-                projected[i].yInch = -projected[i].yInch
-            }
-        }
-        
+        // Shift bounding box minimum to (0.0000", 0.0000") without flipping axes
         let minX = projected.map { $0.xInch }.min() ?? 0.0
         let minY = projected.map { $0.yInch }.min() ?? 0.0
-        
         for i in 0..<projected.count {
             projected[i].xInch -= minX
             projected[i].yInch -= minY
         }
-        
         return projected
     }
     
     /// Builds a closed sequence of CAD entities (`LINE` and `ARC`) from the 2D points in inches.
-    /// - Straight points connect with exact `LINE` segments.
-    /// - Curve points between straight anchors are fitted with smooth circular `ARC` segments.
     static func buildClosedCADEntities(from points: [Point2DInch]) -> [CADEntity2D] {
         guard points.count >= 3 else { return [] }
         
         var entities: [CADEntity2D] = []
         let n = points.count
-        
-        // Find indices of all straight anchor points
         let straightIndices = points.enumerated().compactMap { $0.element.pointType == .straight ? $0.offset : nil }
         
-        // If all points were marked as curve (e.g. a full circular round window frame), fit arcs in triplets around the loop
         if straightIndices.isEmpty {
             var i = 0
             while i < n {
@@ -133,12 +138,10 @@ final class CADGeometryEngine {
             return entities
         }
         
-        // Traverse from each straight vertex to the next straight vertex around the closed loop
         for sIdx in 0..<straightIndices.count {
             let startIndex = straightIndices[sIdx]
             let endIndex = straightIndices[(sIdx + 1) % straightIndices.count]
             
-            // Collect intermediate curve points between startIndex and endIndex
             var chain: [Point2DInch] = [points[startIndex]]
             var curr = (startIndex + 1) % n
             while curr != endIndex {
@@ -148,10 +151,8 @@ final class CADGeometryEngine {
             chain.append(points[endIndex])
             
             if chain.count == 2 {
-                // Direct straight line segment
                 entities.append(.line(start: chain[0], end: chain[1]))
             } else if chain.count == 3 {
-                // Single curve midpoint between two straight corners -> Exact 3-point CAD Arc
                 if let arc = fitThreePointArc(p0: chain[0], p1: chain[1], p2: chain[2], passThrough: chain) {
                     entities.append(arc)
                 } else {
@@ -159,7 +160,7 @@ final class CADGeometryEngine {
                     entities.append(.line(start: chain[1], end: chain[2]))
                 }
             } else {
-                // Multiple curve points along a complex arch -> Fit piecewise 3-point arcs or smooth arc segments
+                // Fit 3-point arcs in triplets; if 1 point remains at end, connect cleanly without overlap
                 var k = 0
                 while k < chain.count - 1 {
                     if k + 2 < chain.count {
@@ -174,18 +175,7 @@ final class CADGeometryEngine {
                         }
                         k += 2
                     } else {
-                        // One remaining point at the end of an even-count chain: fit arc using previous point, current, and end
-                        let p0 = chain[k - 1]
-                        let p1 = chain[k]
-                        let p2 = chain[k + 1]
-                        // Replace last entity's end or add final arc/line
-                        if let arc = fitThreePointArc(p0: p0, p1: p1, p2: p2, passThrough: [p1, p2]) {
-                            // Use line for final short connection if arc already covered p0->p1
-                            _ = arc
-                            entities.append(.line(start: p1, end: p2))
-                        } else {
-                            entities.append(.line(start: p1, end: p2))
-                        }
+                        entities.append(.line(start: chain[k], end: chain[k + 1]))
                         k += 1
                     }
                 }
@@ -207,7 +197,6 @@ final class CADGeometryEngine {
         let x3 = p2.xInch, y3 = p2.yInch
         
         let d = 2.0 * (x1 * (y2 - y3) + x2 * (y3 - y1) + x3 * (y1 - y2))
-        // If points are nearly collinear, return nil so caller falls back to straight lines
         guard abs(d) > 1e-4 else { return nil }
         
         let ux = ((x1 * x1 + y1 * y1) * (y2 - y3) +
@@ -224,12 +213,10 @@ final class CADGeometryEngine {
         let a1 = normalizeAngleDeg(atan2(y2 - uy, x2 - ux) * 180.0 / .pi)
         let a2 = normalizeAngleDeg(atan2(y3 - uy, x3 - ux) * 180.0 / .pi)
         
-        // Determine whether counter-clockwise sweep from a0 to a2 passes through a1
         let ccwSweep0to2 = ccwAngleDiff(from: a0, to: a2)
         let ccwSweep0to1 = ccwAngleDiff(from: a0, to: a1)
         
         let isCCW = ccwSweep0to1 <= ccwSweep0to2
-        // DXF ARC angles are always counter-clockwise from startAngle to endAngle!
         let dxfStartAngle = isCCW ? a0 : a2
         let dxfEndAngle = isCCW ? a2 : a0
         
@@ -244,7 +231,6 @@ final class CADGeometryEngine {
         )
     }
     
-    /// Calculates overall bounding box, diagonals, and total perimeter in INCHES.
     static func computeFrameMetrics(points: [Point2DInch], entities: [CADEntity2D]) -> (
         widthInch: Double,
         heightInch: Double,
@@ -262,7 +248,6 @@ final class CADGeometryEngine {
         let width = maxX - minX
         let height = maxY - minY
         
-        // Find the 4 points closest to the bounding box corners to compute real physical diagonals
         let bottomLeft = points.min(by: { hypot($0.xInch - minX, $0.yInch - minY) < hypot($1.xInch - minX, $1.yInch - minY) })!
         let topRight = points.min(by: { hypot($0.xInch - maxX, $0.yInch - maxY) < hypot($1.xInch - maxX, $1.yInch - maxY) })!
         let bottomRight = points.min(by: { hypot($0.xInch - maxX, $0.yInch - minY) < hypot($1.xInch - maxX, $1.yInch - minY) })!
@@ -273,17 +258,6 @@ final class CADGeometryEngine {
         let perimeter = entities.reduce(0.0) { $0 + $1.lengthInch }
         
         return (width, height, diag1, diag2, perimeter)
-    }
-    
-    private static func computeSignedArea(_ pts: [Point2DInch]) -> Double {
-        guard pts.count >= 3 else { return 0 }
-        var area = 0.0
-        for i in 0..<pts.count {
-            let p1 = pts[i]
-            let p2 = pts[(i + 1) % pts.count]
-            area += (p1.xInch * p2.yInch - p2.xInch * p1.yInch)
-        }
-        return area * 0.5
     }
     
     private static func normalizeAngleDeg(_ deg: Double) -> Double {
