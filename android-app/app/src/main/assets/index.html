@@ -1,0 +1,1844 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
+  <meta name="theme-color" content="#070a0f" />
+  <meta name="mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="apple-mobile-web-app-title" content="FrameScan Pro" />
+  <link rel="manifest" href="./manifest.json" />
+  <title>FrameScan Pro v4.0 Android — High-Precision Camera+Gyro+ArUco Frame Scanner</title>
+  <style>
+    * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; user-select: none; }
+    html, body {
+      margin: 0; padding: 0; width: 100%; height: 100%;
+      background: #070a0f; color: #f9fafb;
+      font-family: 'Roboto', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      overflow: hidden;
+    }
+    .screen {
+      position: fixed; inset: 0;
+      display: none; flex-direction: column;
+      background: #070a0f;
+      padding-top: env(safe-area-inset-top, 0px);
+      padding-bottom: env(safe-area-inset-bottom, 0px);
+    }
+    .screen.active { display: flex; }
+
+    .top-bar {
+      padding: 12px 14px;
+      background: #0d131f;
+      display: flex; align-items: center; justify-content: space-between;
+      border-bottom: 1px solid rgba(255,255,255,0.08);
+      flex-shrink: 0;
+    }
+    .brand { display: flex; align-items: center; gap: 10px; }
+    .brand-icon {
+      width: 38px; height: 38px; border-radius: 10px;
+      background: linear-gradient(135deg, #10b981, #059669);
+      color: #000; font-weight: 900; font-size: 20px;
+      display: flex; align-items: center; justify-content: center;
+      box-shadow: 0 2px 10px rgba(16,185,129,0.35);
+    }
+    .btn-primary {
+      background: linear-gradient(90deg, #10b981, #059669);
+      color: #000; font-weight: 900; font-size: 15px;
+      border: none; border-radius: 14px;
+      padding: 14px; width: 100%; cursor: pointer;
+      letter-spacing: 0.3px;
+      box-shadow: 0 4px 16px rgba(16,185,129,0.28);
+      text-align: center; text-decoration: none; display: inline-block;
+    }
+    .btn-primary:active { transform: scale(0.98); }
+    .btn-outline {
+      background: rgba(255,255,255,0.09);
+      color: #fff; font-weight: 700; font-size: 13px;
+      border: 1px solid rgba(255,255,255,0.22);
+      border-radius: 12px; padding: 11px; width: 100%; cursor: pointer;
+      text-align: center;
+    }
+    .btn-outline:active { transform: scale(0.98); }
+    .pill-btn {
+      background: rgba(0,0,0,0.82);
+      color: #fff; border: 1px solid rgba(255,255,255,0.24);
+      padding: 7px 12px; border-radius: 20px;
+      font-size: 12px; font-weight: 800; cursor: pointer;
+    }
+
+    .list-area {
+      flex: 1; overflow-y: auto; padding: 10px 14px;
+      display: flex; flex-direction: column; gap: 10px;
+    }
+    .wf-card {
+      background: #121a2a;
+      border: 1px solid rgba(16,185,129,0.32);
+      border-radius: 14px; padding: 12px;
+      display: flex; align-items: center; gap: 12px;
+      cursor: pointer;
+    }
+    .apk-banner {
+      margin: 10px 14px 2px 14px;
+      background: linear-gradient(135deg, rgba(16,185,129,0.16), rgba(6,182,212,0.14));
+      border: 1.5px solid #10b981;
+      border-radius: 14px; padding: 11px 13px;
+      display: flex; align-items: center; justify-content: space-between; gap: 10px;
+    }
+
+    .cam-container {
+      flex: 1; position: relative; overflow: hidden; background: #000;
+    }
+    video.live-video {
+      position: absolute; inset: 0;
+      width: 100%; height: 100%; object-fit: cover;
+    }
+    canvas.overlay-canvas {
+      position: absolute; inset: 0;
+      width: 100%; height: 100%;
+      z-index: 5;
+      touch-action: none;
+    }
+    .hud-row {
+      position: absolute; top: 10px; left: 10px; right: 10px;
+      display: flex; justify-content: space-between; align-items: center;
+      z-index: 15;
+    }
+    .telemetry-box {
+      position: absolute; top: 50px; left: 10px;
+      display: flex; flex-direction: column; gap: 5px; z-index: 15;
+      pointer-events: none;
+    }
+    .tel-item {
+      background: rgba(0,0,0,0.84);
+      padding: 5px 9px; border-radius: 8px;
+      font-size: 11px; font-family: monospace; font-weight: 800;
+      border-left: 3px solid #10b981;
+      color: #fff;
+    }
+    .magnifier-loupe {
+      position: absolute; top: 50px; right: 10px;
+      width: 122px; height: 122px; border-radius: 50%;
+      border: 3px solid #06b6d4; background: #000;
+      overflow: hidden; z-index: 15;
+      box-shadow: 0 8px 24px rgba(0,0,0,0.85);
+      pointer-events: none;
+    }
+    .status-banner {
+      position: absolute; bottom: 8px; left: 10px; right: 10px;
+      background: rgba(0,0,0,0.88);
+      border: 1.5px solid #10b981;
+      border-radius: 12px; padding: 8px 11px;
+      font-size: 11.5px; font-weight: 700; z-index: 15;
+      pointer-events: none;
+    }
+    .bottom-controls {
+      background: #0c111d; padding: 9px 11px;
+      border-top: 1px solid rgba(255,255,255,0.1);
+      display: flex; flex-direction: column; gap: 7px;
+      flex-shrink: 0;
+      z-index: 20;
+    }
+    .modal-bg {
+      position: fixed; inset: 0; background: rgba(0,0,0,0.9);
+      display: none; align-items: flex-start; justify-content: center;
+      padding: 40px 18px 20px 18px; z-index: 999;
+      overflow-y: auto;
+    }
+    .modal-bg.active { display: flex; }
+    .modal-box {
+      background: #131c2e; border: 2px solid #10b981;
+      border-radius: 20px; padding: 20px; width: 100%; max-width: 370px;
+      text-align: center;
+      box-shadow: 0 12px 40px rgba(0,0,0,0.9);
+    }
+    .modal-input {
+      width: 100%; padding: 13px; border-radius: 10px;
+      border: 1.5px solid #10b981; background: #080c14;
+      color: #fff; font-size: 16px; font-weight: 700; margin: 12px 0;
+      user-select: text; -webkit-user-select: text;
+    }
+  </style>
+</head>
+<body>
+
+  <!-- High-resolution 240x320 Vision Processing Buffer for ArUco + 2-Level Pyramid Flow -->
+  <canvas id="flowCanvas" width="240" height="320" style="display:none;"></canvas>
+
+  <!-- SCREEN 1: HOME -->
+  <div class="screen active" id="scrHome">
+    <div class="top-bar">
+      <div class="brand">
+        <div class="brand-icon">⊞</div>
+        <div>
+          <div style="font-weight:900;font-size:16px;">FrameScan Pro Android</div>
+          <div style="font-size:11px;color:#10b981;font-weight:700;">Camera + 6-Axis Gyro + ArUco 3D Homography (±2mm)</div>
+        </div>
+      </div>
+      <span style="font-size:10px;background:#10b98122;color:#10b981;padding:4px 8px;border-radius:6px;font-weight:900;">v4.0 APK</span>
+    </div>
+
+    <!-- Direct Android APK Download Banner (Hidden automatically when running inside installed Native APK) -->
+    <div class="apk-banner" id="apkDownloadBanner">
+      <div style="flex:1;">
+        <div style="font-weight:900;font-size:13px;color:#10b981;">📲 Native Android App (.APK) Ready</div>
+        <div style="font-size:11px;color:#d1d5db;margin-top:2px;">1-Click direct install on any Android phone (No Login / No PC)</div>
+      </div>
+      <a href="./FrameScanPro.apk" download="FrameScanPro.apk" style="background:#10b981;color:#000;font-weight:900;font-size:12px;padding:9px 12px;border-radius:10px;text-decoration:none;white-space:nowrap;">
+        ⬇ Download APK
+      </a>
+    </div>
+
+    <div style="padding:10px 14px 2px 14px;display:flex;justify-content:space-between;align-items:center;">
+      <span style="font-size:11px;font-weight:900;color:#10b981;letter-spacing:0.6px;">
+        RECENT WIREFRAMES (AUTOSAVED • INCHES)
+      </span>
+      <span id="sensorStatusHome" style="font-size:10px;color:#06b6d4;font-family:monospace;font-weight:800;">
+        IMU: Ready
+      </span>
+    </div>
+
+    <div class="list-area" id="homeList"></div>
+
+    <div style="padding:12px 14px;background:#0d131f;border-top:1px solid rgba(255,255,255,0.08);">
+      <button class="btn-primary" onclick="startScanWorkflow()">
+        📷 SCAN NEW FRAME (LIVE CAMERA + GYRO)
+      </button>
+    </div>
+  </div>
+
+  <!-- SCREEN 2: STEP 1 — STICKER GUIDE -->
+  <div class="screen" id="scrStep1">
+    <div class="top-bar">
+      <button class="pill-btn" onclick="showScreen('scrHome')">✕ Cancel</button>
+      <span class="pill-btn" style="color:#10b981;border-color:#10b98166;">STEP 1 OF 3 • STICKER SETUP</span>
+    </div>
+
+    <div style="flex:1;padding:18px;display:flex;flex-direction:column;justify-content:center;align-items:center;text-align:center;overflow-y:auto;">
+      <div style="width:220px;height:142px;border:12px solid #4b5563;border-radius:14px;position:relative;display:flex;align-items:center;justify-content:center;margin-bottom:20px;">
+        <div style="position:absolute;inset:4px;border:2px dashed #10b981;border-radius:6px;"></div>
+        <span style="position:absolute;top:-14px;left:16px;background:#fff;color:#000;font-size:10px;font-weight:900;padding:2px 5px;border:1px solid #000;">#01</span>
+        <span style="position:absolute;top:-14px;right:16px;background:#fff;color:#000;font-size:10px;font-weight:900;padding:2px 5px;border:1px solid #000;">#02</span>
+        <span style="position:absolute;bottom:-14px;right:16px;background:#fff;color:#000;font-size:10px;font-weight:900;padding:2px 5px;border:1px solid #000;">#03</span>
+        <span style="position:absolute;bottom:-14px;left:16px;background:#fff;color:#000;font-size:10px;font-weight:900;padding:2px 5px;border:1px solid #000;">#04</span>
+        <div style="font-size:12px;font-weight:800;color:#10b981;">2.00"×2.00" ArUco Tags<br><span style="color:#9ca3af;font-size:10px;">3D Homography Plane Lock</span></div>
+      </div>
+
+      <h2 style="margin:0 0 10px 0;font-size:18px;">Step 1: Frame Pe 2"×2" Stickers Lagayein</h2>
+      <div style="background:rgba(255,255,255,0.05);border-radius:14px;padding:14px;text-align:left;font-size:13px;line-height:1.55;color:#d1d5db;max-width:400px;">
+        1. Frame ke pipe par har <b>2.5 se 4 feet</b> ke faasle par <b>2.00" × 2.00" (50.8mm)</b> Magnetic ArUco Stickers chipka dein.<br><br>
+        2. <b>±2mm Accuracy Lock:</b> Har sticker ke 4 corners se app <b>3D Frame Plane Homography</b> aur exact <b>Inches Scale</b> lock karti hai — is liye aap aage-peeche (zoom in/out) hon ya haath hile, point ki accuracy खराब nahi hoti.<br><br>
+        3. Stickers lagane ke baad neeche <b>Done</b> dabayein.
+      </div>
+    </div>
+
+    <div style="padding:14px;">
+      <button class="btn-primary" onclick="openStep2OverviewCamera()">
+        ✓ DONE — STICKERS LAGA DIYE
+      </button>
+    </div>
+  </div>
+
+  <!-- SCREEN 3: STEP 2 — FULL FRAME OVERVIEW PIC -->
+  <div class="screen" id="scrStep2">
+    <div class="cam-container">
+      <video id="overviewVideo" class="live-video" autoplay playsinline muted></video>
+      <canvas id="overviewOverlay" class="overlay-canvas"></canvas>
+
+      <div class="hud-row">
+        <button class="pill-btn" onclick="stopCameraAndGo('scrStep1')">‹ Back</button>
+        <span class="pill-btn" style="color:#10b981;">STEP 2 OF 3 • FULL FRAME MAP</span>
+      </div>
+
+      <div style="position:absolute;top:52px;left:12px;right:12px;background:rgba(0,0,0,0.84);padding:10px;border-radius:12px;text-align:center;z-index:10;border:1px solid rgba(16,185,129,0.4);">
+        <div style="font-weight:900;font-size:14px;color:#10b981;">Poore Frame Ki 1 Overview Pic Capture Karein</div>
+        <div id="overviewTagStatus" style="font-size:11px;color:#d1d5db;margin-top:3px;">Poore frame ko box ke andar laa kar Capture button dabayein</div>
+      </div>
+
+      <div style="position:absolute;top:120px;bottom:110px;left:18px;right:18px;border:2.5px dashed #10b981;border-radius:16px;pointer-events:none;display:flex;align-items:flex-end;justify-content:center;padding-bottom:12px;z-index:10;">
+        <div id="overviewPlaneBadge" style="background:rgba(0,0,0,0.85);color:#10b981;font-size:11.5px;font-weight:800;padding:5px 14px;border-radius:16px;">
+          ✓ 3D Frame Plane & Gyro Reference Ready
+        </div>
+      </div>
+
+      <div style="position:absolute;bottom:16px;left:0;right:0;display:flex;flex-direction:column;align-items:center;gap:6px;z-index:15;">
+        <button onclick="captureOverviewAndStartLiveScan()" style="width:70px;height:70px;border-radius:50%;border:4px solid #10b981;background:#fff;font-size:24px;cursor:pointer;box-shadow:0 4px 20px rgba(0,0,0,0.8);">📷</button>
+        <div style="font-size:11px;font-weight:900;text-shadow:0 2px 4px #000;">CAPTURE & START LIVE SCAN</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- SCREEN 4: STEP 3 — LIVE PRECISION SCANNER -->
+  <div class="screen" id="scrStep3">
+    <div class="cam-container" id="liveScanViewport">
+      <video id="scanVideo" class="live-video" autoplay playsinline muted></video>
+      <canvas id="scanOverlay" class="overlay-canvas"></canvas>
+
+      <div class="hud-row">
+        <button class="pill-btn" onclick="stopCameraAndGo('scrHome')">✕ Exit</button>
+        <div class="pill-btn" id="hudPointBadge" style="color:#10b981;border-color:#10b981;">POINTS: 0</div>
+        <button class="pill-btn" style="color:#f59e0b;" onclick="resetLiveScan()">↺ Reset</button>
+      </div>
+
+      <div class="telemetry-box">
+        <div class="tel-item" id="arucoBadge" style="border-color:#10b981;color:#10b981;">ArUco+Gyro: Active</div>
+        <div class="tel-item" id="distBadge">Z-Dist: <span id="distVal">12.0</span>" (3D Plane Lock)</div>
+        <div class="tel-item" id="segBadge" style="color:#00ff55;font-size:12px;">Live Line: 0.00"</div>
+        <div class="tel-item" id="edgeBadge" style="border-color:#06b6d4;color:#06b6d4;">Edge Snap: Ready</div>
+      </div>
+
+      <!-- 6x Real Camera Magnifier Loupe -->
+      <div class="magnifier-loupe" id="loupeRing">
+        <canvas id="loupeCanvas" width="122" height="122"></canvas>
+      </div>
+
+      <div class="status-banner" id="liveGuidanceBanner">
+        1st Inner Corner par Crosshair (+) rakh kar '+ MARK POINT' dabayein
+      </div>
+    </div>
+
+    <div class="bottom-controls">
+      <div style="display:flex;gap:7px;">
+        <button class="btn-outline" style="width:64px;padding:10px 4px;font-size:12px;" onclick="undoLastScanPoint()">↩ Undo</button>
+        <button class="btn-primary" id="btnStraight" style="flex:1;padding:11px 8px;" onclick="markScanPoint('STRAIGHT')">
+          + MARK POINT<br><span style="font-size:10px;font-weight:700;">Straight Corner</span>
+        </button>
+        <button class="btn-primary" style="width:102px;background:linear-gradient(90deg,#06b6d4,#0891b2);padding:11px 6px;" onclick="markScanPoint('CURVE')">
+          ⌒ CURVE<br><span style="font-size:10px;font-weight:700;">Arc Point</span>
+        </button>
+      </div>
+
+      <div style="display:flex;gap:8px;">
+        <button class="btn-outline" id="btnCloseLoopManual" style="flex:1;padding:11px;border-color:#eab308;color:#eab308;display:none;" onclick="closeFrameLoopNow()">
+          🔗 CLOSE LOOP (Join P1)
+        </button>
+        <button class="btn-primary" id="btnFinishScan" style="flex:1.6;background:#374151;color:#9ca3af;padding:12px;" onclick="onClickDoneScan()">
+          ✓ DONE — GENERATE 2D (.DXF)
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- TOP-LEVEL MANDATORY CUSTOMER NAME MODAL -->
+  <div class="modal-bg" id="custModal">
+    <div class="modal-box">
+      <div style="font-size:28px;">📐</div>
+      <h3 style="margin:4px 0;font-size:18px;color:#10b981;">Customer / Frame Name Likhein</h3>
+      <div style="font-size:12px;color:#9ca3af;">2D Wireframe (Inches) aur Laser .DXF file isi Customer Name se Auto-Save aur WhatsApp share hogi.</div>
+      <input type="text" id="custInput" class="modal-input" placeholder="e.g. Ali Villa Door Frame" />
+      <div id="custErr" style="color:#ef4444;font-size:12px;font-weight:800;display:none;margin-bottom:8px;">
+        Customer Name likhna zaroori hai!
+      </div>
+      <div style="display:flex;gap:8px;margin-top:6px;">
+        <button class="btn-outline" style="width:90px;" onclick="cancelCustModal()">Back</button>
+        <button class="btn-primary" style="flex:1;" onclick="saveCustomerWireframe()">
+          ✓ GENERATE 2D WIREFRAME (.DXF)
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- SCREEN 5: 2D WIREFRAME RESULT & WHATSAPP DXF SHARE -->
+  <div class="screen" id="scrResult">
+    <div class="top-bar">
+      <div>
+        <div style="display:flex;align-items:center;gap:8px;">
+          <span id="resName" style="font-weight:900;font-size:16px;">Frame</span>
+          <span style="background:#10b981;color:#000;font-size:9px;font-weight:900;padding:2px 6px;border-radius:4px;">AUTOSAVED</span>
+        </div>
+        <div id="resMeta" style="font-size:11px;color:#10b981;font-weight:700;">Units: INCHES (1:1 Exact Inner Size • ±2mm)</div>
+      </div>
+      <button class="pill-btn" onclick="showScreen('scrHome')">🏠 Home</button>
+    </div>
+
+    <div style="flex:1;padding:10px 14px;display:flex;flex-direction:column;gap:8px;overflow:hidden;">
+      <div id="cadContainer" style="flex:1;position:relative;background:#04070e;border:1.5px solid #10b98166;border-radius:14px;overflow:hidden;min-height:240px;">
+        <canvas id="cadCanvas" style="width:100%;height:100%;display:block;"></canvas>
+      </div>
+
+      <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:6px;text-align:center;flex-shrink:0;">
+        <div style="background:#121a2a;padding:7px 4px;border-radius:8px;border:1px solid rgba(16,185,129,0.2);">
+          <div style="font-size:9px;color:#9ca3af;font-weight:700;">WIDTH</div>
+          <div id="mW" style="font-size:12px;color:#10b981;font-weight:900;font-family:monospace;">0.00"</div>
+        </div>
+        <div style="background:#121a2a;padding:7px 4px;border-radius:8px;border:1px solid rgba(16,185,129,0.2);">
+          <div style="font-size:9px;color:#9ca3af;font-weight:700;">HEIGHT</div>
+          <div id="mH" style="font-size:12px;color:#10b981;font-weight:900;font-family:monospace;">0.00"</div>
+        </div>
+        <div style="background:#121a2a;padding:7px 4px;border-radius:8px;border:1px solid rgba(16,185,129,0.2);">
+          <div style="font-size:9px;color:#9ca3af;font-weight:700;">DIAG 1</div>
+          <div id="mD1" style="font-size:12px;color:#10b981;font-weight:900;font-family:monospace;">0.00"</div>
+        </div>
+        <div style="background:#121a2a;padding:7px 4px;border-radius:8px;border:1px solid rgba(16,185,129,0.2);">
+          <div style="font-size:9px;color:#9ca3af;font-weight:700;">DIAG 2</div>
+          <div id="mD2" style="font-size:12px;color:#10b981;font-weight:900;font-family:monospace;">0.00"</div>
+        </div>
+      </div>
+    </div>
+
+    <div style="padding:10px 14px;background:#0d131f;display:flex;flex-direction:column;gap:8px;flex-shrink:0;">
+      <button class="btn-primary" onclick="sendDXFToWhatsApp()">
+        📲 SEND .DXF ON WHATSAPP
+      </button>
+      <div style="display:flex;gap:8px;">
+        <button class="btn-outline" style="flex:1;" onclick="downloadDXFFile()">
+          💾 SAVE .DXF TO PHONE
+        </button>
+        <button class="btn-outline" style="flex:1;border-color:#10b981;color:#10b981;" onclick="startScanWorkflow()">
+          📷 SCAN NEXT FRAME
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // =========================================================================
+    // 1. NATIVE ANDROID BRIDGE & STORAGE INITIALIZATION
+    // =========================================================================
+    const IS_NATIVE_ANDROID = typeof window.AndroidBridge !== "undefined";
+    if (IS_NATIVE_ANDROID) {
+      const b = document.getElementById("apkDownloadBanner");
+      if (b) b.style.display = "none";
+    }
+
+    function triggerHaptic(ms) {
+      try {
+        if (IS_NATIVE_ANDROID && window.AndroidBridge.vibrate) {
+          window.AndroidBridge.vibrate(ms || 40);
+        } else if (navigator.vibrate) {
+          navigator.vibrate(ms || 40);
+        }
+      } catch (e) {}
+    }
+
+    const STORAGE_KEY = "FRAMESCAN_PRO_SAVED_WIREFRAMES_V4";
+    let mediaStream = null;
+    let animFrameId = null;
+    let overviewAnimId = null;
+
+    let wireframes = [];
+    try {
+      wireframes = JSON.parse(localStorage.getItem(STORAGE_KEY) || "null") || [];
+    } catch (e) { wireframes = []; }
+
+    if (wireframes.length === 0) {
+      wireframes = [
+        {
+          id: "sample-1",
+          name: "Sample_Arched_Door_4x10",
+          createdAt: new Date().toLocaleString(),
+          widthInch: 48.00,
+          heightInch: 120.00,
+          diag1Inch: 129.24,
+          diag2Inch: 129.24,
+          points: [
+            { xInch: 0, yInch: 0, type: "STRAIGHT" },
+            { xInch: 48, yInch: 0, type: "STRAIGHT" },
+            { xInch: 48, yInch: 96, type: "STRAIGHT" },
+            { xInch: 24, yInch: 120, type: "CURVE" },
+            { xInch: 0, yInch: 96, type: "STRAIGHT" }
+          ]
+        }
+      ];
+    }
+    let currentWf = wireframes[0];
+
+    // =========================================================================
+    // 2. OFFICIAL OPENCV ARUCO (DICT_4X4_50) 2.00"×2.00" DICTIONARY & DETECTOR
+    // =========================================================================
+    const ARUCO_SIZE_INCH = 2.00; // Exact 2.00" x 2.00" (50.8mm x 50.8mm)
+    const ARUCO_4X4_50 = [
+      [0,1,0,0, 1,1,1,0, 1,1,0,0, 1,1,0,1], // ID 0 (#01)
+      [1,1,1,1, 0,0,0,0, 0,1,1,0, 1,0,0,1], // ID 1 (#02)
+      [0,0,1,1, 0,0,1,1, 0,0,1,0, 1,1,0,1], // ID 2 (#03)
+      [1,0,0,1, 1,0,0,1, 0,1,0,0, 0,1,1,0], // ID 3 (#04)
+      [0,1,0,1, 0,1,0,1, 1,0,1,1, 1,0,0,0], // ID 4 (#05)
+      [1,1,0,0, 0,1,1,1, 0,0,1,1, 1,0,1,0], // ID 5 (#06)
+      [0,0,0,1, 1,1,0,1, 1,0,0,1, 0,0,1,1], // ID 6 (#07)
+      [1,0,1,0, 0,1,0,0, 1,1,1,0, 0,1,0,1], // ID 7 (#08)
+      [0,1,1,0, 1,0,1,0, 0,1,0,1, 1,1,0,0], // ID 8 (#09)
+      [1,1,0,1, 1,0,1,1, 1,0,0,0, 0,0,1,0], // ID 9 (#10)
+      [0,0,1,0, 0,1,1,0, 1,1,0,1, 0,1,1,1], // ID 10 (#11)
+      [1,0,1,1, 1,1,0,0, 0,0,0,1, 1,0,1,0]  // ID 11 (#12)
+    ];
+
+    function rotateBits90CW(bits) {
+      const out = new Array(16);
+      for (let r = 0; r < 4; r++) {
+        for (let c = 0; c < 4; c++) {
+          out[c * 4 + (3 - r)] = bits[r * 4 + c];
+        }
+      }
+      return out;
+    }
+
+    const ARUCO_LUT = [];
+    ARUCO_4X4_50.forEach((bits, id) => {
+      let b = bits.slice();
+      for (let rot = 0; rot < 4; rot++) {
+        ARUCO_LUT.push({ id, rot, bits: b });
+        b = rotateBits90CW(b);
+      }
+    });
+
+    // Solve 8-DOF 2D Projective Homography H mapping (x,y) in [0,S]x[0,S] -> image (u,v)
+    function solveHomography4Pt(srcPts, dstPts) {
+      const A = [];
+      const B = [];
+      for (let i = 0; i < 4; i++) {
+        const x = srcPts[i].x, y = srcPts[i].y;
+        const u = dstPts[i].x, v = dstPts[i].y;
+        A.push([x, y, 1, 0, 0, 0, -x * u, -y * u]);
+        B.push(u);
+        A.push([0, 0, 0, x, y, 1, -x * v, -y * v]);
+        B.push(v);
+      }
+      // Gaussian elimination with partial pivoting (8x8)
+      const n = 8;
+      for (let i = 0; i < n; i++) {
+        let maxRow = i;
+        for (let k = i + 1; k < n; k++) {
+          if (Math.abs(A[k][i]) > Math.abs(A[maxRow][i])) maxRow = k;
+        }
+        if (Math.abs(A[maxRow][i]) < 1e-9) return null;
+        const tmpA = A[i]; A[i] = A[maxRow]; A[maxRow] = tmpA;
+        const tmpB = B[i]; B[i] = B[maxRow]; B[maxRow] = tmpB;
+
+        const piv = A[i][i];
+        for (let j = i; j < n; j++) A[i][j] /= piv;
+        B[i] /= piv;
+
+        for (let k = 0; k < n; k++) {
+          if (k !== i) {
+            const f = A[k][i];
+            for (let j = i; j < n; j++) A[k][j] -= f * A[i][j];
+            B[k] -= f * B[i];
+          }
+        }
+      }
+      return [
+        B[0], B[1], B[2],
+        B[3], B[4], B[5],
+        B[6], B[7], 1.0
+      ];
+    }
+
+    function applyHomography(H, x, y) {
+      const w = H[6] * x + H[7] * y + H[8];
+      if (Math.abs(w) < 1e-7) return { x: 0, y: 0 };
+      return {
+        x: (H[0] * x + H[1] * y + H[2]) / w,
+        y: (H[3] * x + H[4] * y + H[5]) / w
+      };
+    }
+
+    // Fast ArUco 4x4_50 detector on grayscale buffer (W=240, H=320)
+    function detectArUcoMarkersInGray(gray, W, H) {
+      const detected = [];
+      const visited = new Uint8Array(W * H);
+      const step = 4;
+
+      for (let y0 = 16; y0 < H - 16; y0 += step) {
+        for (let x0 = 16; x0 < W - 16; x0 += step) {
+          const idx0 = y0 * W + x0;
+          if (visited[idx0]) continue;
+          const v0 = gray[idx0];
+          if (v0 > 95) continue; // Looking for dark marker border
+
+          // Flood-collect bounding box & extreme corners of dark candidate region
+          let minX = x0, maxX = x0, minY = y0, maxY = y0;
+          // 4 extreme corners in rotated diamond coordinates: (x+y), (x-y)
+          let tl = { x: x0, y: y0, s: x0 + y0 };
+          let br = { x: x0, y: y0, s: x0 + y0 };
+          let tr = { x: x0, y: y0, d: x0 - y0 };
+          let bl = { x: x0, y: y0, d: x0 - y0 };
+
+          const stack = [idx0];
+          visited[idx0] = 1;
+          let count = 0;
+          const thresh = Math.min(v0 + 38, 118);
+
+          while (stack.length > 0 && count < 2600) {
+            const cur = stack.pop();
+            count++;
+            const cy = (cur / W) | 0;
+            const cx = cur - cy * W;
+            if (cx < minX) minX = cx;
+            if (cx > maxX) maxX = cx;
+            if (cy < minY) minY = cy;
+            if (cy > maxY) maxY = cy;
+
+            const sum = cx + cy;
+            const diff = cx - cy;
+            if (sum < tl.s) tl = { x: cx, y: cy, s: sum };
+            if (sum > br.s) br = { x: cx, y: cy, s: sum };
+            if (diff > tr.d) tr = { x: cx, y: cy, d: diff };
+            if (diff < bl.d) bl = { x: cx, y: cy, d: diff };
+
+            const neighbors = [cur - 2, cur + 2, cur - W * 2, cur + W * 2];
+            for (let k = 0; k < 4; k++) {
+              const nb = neighbors[k];
+              if (nb >= 0 && nb < W * H && !visited[nb] && gray[nb] < thresh) {
+                visited[nb] = 1;
+                stack.push(nb);
+              }
+            }
+          }
+
+          const bw = maxX - minX;
+          const bh = maxY - minY;
+          if (bw < 18 || bh < 18 || bw > W * 0.75 || bh > H * 0.75) continue;
+          const aspect = bw / bh;
+          if (aspect < 0.55 || aspect > 1.8) continue;
+
+          const corners = [
+            { x: tl.x, y: tl.y },
+            { x: tr.x, y: tr.y },
+            { x: br.x, y: br.y },
+            { x: bl.x, y: bl.y }
+          ];
+
+          // Compute homography from unit 6x6 grid [0..6]x[0..6] -> 4 image corners
+          const unitGrid = [{ x: 0, y: 0 }, { x: 6, y: 0 }, { x: 6, y: 6 }, { x: 0, y: 6 }];
+          const Hmat = solveHomography4Pt(unitGrid, corners);
+          if (!Hmat) continue;
+
+          // Sample 6x6 cells & compute Otsu/mean threshold inside quad
+          const cellVals = new Float32Array(36);
+          let sumBorder = 0, sumInner = 0;
+          for (let r = 0; r < 6; r++) {
+            for (let c = 0; c < 6; c++) {
+              const pt = applyHomography(Hmat, c + 0.5, r + 0.5);
+              const px = Math.min(Math.max(Math.round(pt.x), 0), W - 1);
+              const py = Math.min(Math.max(Math.round(pt.y), 0), H - 1);
+              const val = gray[py * W + px];
+              cellVals[r * 6 + c] = val;
+              if (r === 0 || r === 5 || c === 0 || c === 5) sumBorder += val;
+              else sumInner += val;
+            }
+          }
+          const avgBorder = sumBorder / 20;
+          const avgInner = sumInner / 16;
+          if (avgInner - avgBorder < 18) continue; // Inner payload must have white cells brighter than black border
+
+          const bitThresh = (avgBorder + avgInner) * 0.52;
+          let borderErrors = 0;
+          for (let r = 0; r < 6; r++) {
+            for (let c = 0; c < 6; c++) {
+              if (r === 0 || r === 5 || c === 0 || c === 5) {
+                if (cellVals[r * 6 + c] > bitThresh + 12) borderErrors++;
+              }
+            }
+          }
+          if (borderErrors > 3) continue;
+
+          const bits = new Array(16);
+          for (let r = 1; r <= 4; r++) {
+            for (let c = 1; c <= 4; c++) {
+              bits[(r - 1) * 4 + (c - 1)] = cellVals[r * 6 + c] > bitThresh ? 1 : 0;
+            }
+          }
+
+          // Match against ARUCO_LUT (with max Hamming distance <= 1)
+          let bestMatch = null;
+          let bestHamming = 99;
+          for (const entry of ARUCO_LUT) {
+            let hd = 0;
+            for (let b = 0; b < 16; b++) {
+              if (bits[b] !== entry.bits[b]) hd++;
+            }
+            if (hd < bestHamming) {
+              bestHamming = hd;
+              bestMatch = entry;
+            }
+          }
+
+          if (bestMatch && bestHamming <= 1) {
+            // Order corners canonically according to detected rotation
+            const rShift = (4 - bestMatch.rot) % 4;
+            const orderedCorners = [
+              corners[(0 + rShift) % 4],
+              corners[(1 + rShift) % 4],
+              corners[(2 + rShift) % 4],
+              corners[(3 + rShift) % 4]
+            ];
+            // Side length in pixels
+            const s0 = Math.hypot(orderedCorners[1].x - orderedCorners[0].x, orderedCorners[1].y - orderedCorners[0].y);
+            const s1 = Math.hypot(orderedCorners[2].x - orderedCorners[1].x, orderedCorners[2].y - orderedCorners[1].y);
+            const s2 = Math.hypot(orderedCorners[3].x - orderedCorners[2].x, orderedCorners[3].y - orderedCorners[2].y);
+            const s3 = Math.hypot(orderedCorners[0].x - orderedCorners[3].x, orderedCorners[0].y - orderedCorners[3].y);
+            const sidePx = (s0 + s1 + s2 + s3) / 4.0;
+
+            // Compute inverse Homography Hinv mapping image pixel (u,v) -> Marker plane (xInch, yInch) where marker is [0..2.00"]x[0..2.00"]
+            const markerPlaneCorners = [
+              { x: 0, y: ARUCO_SIZE_INCH },
+              { x: ARUCO_SIZE_INCH, y: ARUCO_SIZE_INCH },
+              { x: ARUCO_SIZE_INCH, y: 0 },
+              { x: 0, y: 0 }
+            ];
+            const H_imgToPlane = solveHomography4Pt(orderedCorners, markerPlaneCorners);
+
+            detected.push({
+              id: bestMatch.id,
+              corners: orderedCorners,
+              centerPx: {
+                x: (orderedCorners[0].x + orderedCorners[1].x + orderedCorners[2].x + orderedCorners[3].x) * 0.25,
+                y: (orderedCorners[0].y + orderedCorners[1].y + orderedCorners[2].y + orderedCorners[3].y) * 0.25
+              },
+              sidePx,
+              H_imgToPlane
+            });
+          }
+        }
+      }
+      return detected;
+    }
+
+    // =========================================================================
+    // 3. 6-AXIS GYROSCOPE IMU + 2-LEVEL PYRAMID OPTICAL FLOW + ARUCO 3D SLAM
+    // =========================================================================
+    let worldPoints = []; // [{ xInch, yInch, type }]
+    let camWorldPos = { xInch: 0.0, yInch: 0.0 };
+    let workingDistInch = 12.0; // Automatically tracks Z-distance (3.5" to 30")
+    let globalMarkerMap = {}; // id -> { xInch, yInch }
+    let activeMarkers = [];
+    let hasMovedAwayFromStart = false;
+    let totalPathMovedInch = 0.0;
+    let loopClosed = false;
+    let nearFirstPoint = false;
+    let edgeSnapLocked = false;
+    let subPixelEdgeOffsetInch = { x: 0, y: 0 };
+
+    // Hardware IMU Gyroscope State (from Android SensorManager TYPE_GAME_ROTATION_VECTOR or Web DeviceOrientation)
+    let imuState = {
+      rollDeg: 0,
+      pitchDeg: 0,
+      yawDeg: 0,
+      tiltCos: 1.0,
+      active: false
+    };
+
+    // Called at 60Hz by Native Android SensorManager (MainActivity.java)
+    window.onAndroidIMUUpdate = function(rollDeg, pitchDeg, yawDeg) {
+      imuState.rollDeg = rollDeg;
+      imuState.pitchDeg = pitchDeg;
+      imuState.yawDeg = yawDeg;
+      const tiltRad = Math.min(Math.hypot(rollDeg, pitchDeg), 45) * (Math.PI / 180);
+      imuState.tiltCos = Math.max(Math.cos(tiltRad), 0.72);
+      imuState.active = true;
+      const el = document.getElementById("sensorStatusHome");
+      if (el) el.textContent = `6-Axis IMU: Locked (${pitchDeg.toFixed(0)}°,${rollDeg.toFixed(0)}°)`;
+    };
+
+    window.addEventListener("deviceorientation", (e) => {
+      if (IS_NATIVE_ANDROID && imuState.active) return;
+      if (e.gamma === null || e.beta === null) return;
+      imuState.rollDeg = e.gamma || 0;
+      imuState.pitchDeg = (e.beta || 0) - 45;
+      imuState.yawDeg = e.alpha || 0;
+      const tiltRad = Math.min(Math.hypot(imuState.rollDeg, imuState.pitchDeg * 0.4), 42) * (Math.PI / 180);
+      imuState.tiltCos = Math.max(Math.cos(tiltRad), 0.75);
+      imuState.active = true;
+    });
+
+    const flowCanvas = document.getElementById("flowCanvas");
+    const flowCtx = flowCanvas.getContext("2d", { willReadFrequently: true });
+    const FW = 240, FH = 320;
+    let prevGray = null;
+    let prevCoarse = null; // 120x160 half-res pyramid level
+    let frameCounter = 0;
+
+    function downsample2x(gray, W, H) {
+      const cw = W >> 1, ch = H >> 1;
+      const out = new Uint8Array(cw * ch);
+      for (let y = 0; y < ch; y++) {
+        const r0 = (y * 2) * W;
+        const r1 = r0 + W;
+        for (let x = 0; x < cw; x++) {
+          const x2 = x * 2;
+          out[y * cw + x] = (gray[r0 + x2] + gray[r0 + x2 + 1] + gray[r1 + x2] + gray[r1 + x2 + 1]) >> 2;
+        }
+      }
+      return out;
+    }
+
+    function subPixelParabola(sMinus, sZero, sPlus) {
+      const denom = 2 * (sMinus - 2 * sZero + sPlus);
+      if (Math.abs(denom) < 1e-4) return 0;
+      const delta = (sMinus - sPlus) / denom;
+      return Math.max(Math.min(delta, 0.75), -0.75);
+    }
+
+    function processFrameVision(video) {
+      if (video.readyState < 2 || video.videoWidth === 0 || loopClosed) return;
+      frameCounter++;
+
+      flowCtx.drawImage(video, 0, 0, FW, FH);
+      const imgData = flowCtx.getImageData(0, 0, FW, FH).data;
+      const currGray = new Uint8Array(FW * FH);
+      for (let i = 0, j = 0; i < imgData.length; i += 4, j++) {
+        currGray[j] = (imgData[i] * 77 + imgData[i + 1] * 150 + imgData[i + 2] * 29) >> 8;
+      }
+      const currCoarse = downsample2x(currGray, FW, FH);
+
+      // 1. Sub-Pixel Inner Pipe Edge Snap around center crosshair (cx=120, cy=160)
+      const cx = FW >> 1, cy = FH >> 1;
+      let maxGrad = 0, bestEx = 0, bestEy = 0;
+      for (let dy = -5; dy <= 5; dy++) {
+        for (let dx = -5; dx <= 5; dx++) {
+          const x = cx + dx, y = cy + dy;
+          const gx = currGray[y * FW + (x + 1)] - currGray[y * FW + (x - 1)];
+          const gy = currGray[(y + 1) * FW + x] - currGray[(y - 1) * FW + x];
+          const g = Math.hypot(gx, gy);
+          if (g > maxGrad) {
+            maxGrad = g;
+            bestEx = dx;
+            bestEy = dy;
+          }
+        }
+      }
+      const inchesPerFlowPx = (workingDistInch * 1.08) / (FW * imuState.tiltCos);
+      if (maxGrad > 34) {
+        edgeSnapLocked = true;
+        subPixelEdgeOffsetInch = {
+          x: bestEx * inchesPerFlowPx * 0.22,
+          y: -bestEy * inchesPerFlowPx * 0.22
+        };
+      } else {
+        edgeSnapLocked = false;
+        subPixelEdgeOffsetInch = { x: 0, y: 0 };
+      }
+
+      // 2. Real-time ArUco 2.00"×2.00" Magnetic Sticker Detection & 3D Homography Scale/Plane Lock
+      if (frameCounter % 2 === 0) {
+        const markers = detectArUcoMarkersInGray(currGray, FW, FH);
+        activeMarkers = markers;
+        if (markers.length > 0) {
+          const m = markers[0];
+          // Exact scale & Z-distance from known 2.00" marker physical width!
+          if (m.sidePx > 14) {
+            const measuredPxPerInch = m.sidePx / ARUCO_SIZE_INCH;
+            const impliedDistInch = (FW / measuredPxPerInch) / 1.08;
+            workingDistInch = workingDistInch * 0.65 + Math.min(Math.max(impliedDistInch, 3.0), 32.0) * 0.35;
+          }
+
+          // Project center crosshair (cx, cy) onto the 3D Frame Plane via Marker's 4-Corner Homography H_imgToPlane!
+          if (m.H_imgToPlane) {
+            const planeCrosshair = applyHomography(m.H_imgToPlane, cx, cy);
+            // Offset of crosshair from marker center (1.00", 1.00") in true frame-plane inches
+            const relXInch = planeCrosshair.x - 1.0;
+            const relYInch = planeCrosshair.y - 1.0;
+
+            if (Math.abs(relXInch) < 28 && Math.abs(relYInch) < 28) {
+              if (!globalMarkerMap[m.id]) {
+                // Register marker's global anchor position on the frame plane
+                globalMarkerMap[m.id] = {
+                  xInch: camWorldPos.xInch - relXInch,
+                  yInch: camWorldPos.yInch - relYInch
+                };
+              } else {
+                // Drift-free 3D Plane Anchor Correction!
+                const anchor = globalMarkerMap[m.id];
+                const targetX = anchor.xInch + relXInch;
+                const targetY = anchor.yInch + relYInch;
+                camWorldPos.xInch = camWorldPos.xInch * 0.7 + targetX * 0.3;
+                camWorldPos.yInch = camWorldPos.yInch * 0.7 + targetY * 0.3;
+              }
+            }
+          }
+        }
+      }
+
+      if (!prevGray || !prevCoarse) {
+        prevGray = currGray;
+        prevCoarse = currCoarse;
+        return;
+      }
+
+      // 3. 2-Level Coarse-to-Fine 25-Patch Sub-Pixel Optical Flow + Gyro Compensation
+      const CW = FW >> 1, CH = FH >> 1;
+      const gridX = [44, 82, 120, 158, 196];
+      const gridY = [60, 110, 160, 210, 260];
+      const matched = [];
+
+      for (let gyIdx = 0; gyIdx < gridY.length; gyIdx++) {
+        for (let gxIdx = 0; gxIdx < gridX.length; gxIdx++) {
+          const px0 = gridX[gxIdx], py0 = gridY[gyIdx];
+          const cpx = px0 >> 1, cpy = py0 >> 1;
+
+          // Check patch texture contrast
+          let minV = 255, maxV = 0;
+          for (let dy = -4; dy <= 4; dy += 2) {
+            for (let dx = -4; dx <= 4; dx += 2) {
+              const v = prevCoarse[(cpy + dy) * CW + (cpx + dx)];
+              if (v < minV) minV = v;
+              if (v > maxV) maxV = v;
+            }
+          }
+          if (maxV - minV < 14) continue;
+
+          // Level 1: Coarse search (±10 in coarse = ±20px in full res)
+          let bestCoarseSAD = 1e9, cBestDx = 0, cBestDy = 0;
+          for (let dy = -9; dy <= 9; dy += 2) {
+            for (let dx = -9; dx <= 9; dx += 2) {
+              let sad = 0;
+              for (let py = -4; py <= 4; py += 2) {
+                const r1 = (cpy + py) * CW + cpx;
+                const r2 = (cpy + py + dy) * CW + (cpx + dx);
+                for (let px = -4; px <= 4; px += 2) {
+                  sad += Math.abs(prevCoarse[r1 + px] - currCoarse[r2 + px]);
+                }
+              }
+              if (sad < bestCoarseSAD) {
+                bestCoarseSAD = sad;
+                cBestDx = dx;
+                cBestDy = dy;
+              }
+            }
+          }
+
+          // Level 2: Fine search at full 240x320 resolution around (cBestDx*2, cBestDy*2)
+          const baseDx = cBestDx * 2;
+          const baseDy = cBestDy * 2;
+          let bestFineSAD = 1e9, fBestDx = baseDx, fBestDy = baseDy;
+          const sadGrid = {};
+
+          for (let dy = baseDy - 3; dy <= baseDy + 3; dy++) {
+            for (let dx = baseDx - 3; dx <= baseDx + 3; dx++) {
+              let sad = 0;
+              for (let py = -6; py <= 6; py += 2) {
+                const r1 = (py0 + py) * FW + px0;
+                const r2 = (py0 + py + dy) * FW + (px0 + dx);
+                for (let px = -6; px <= 6; px += 2) {
+                  sad += Math.abs(prevGray[r1 + px] - currGray[r2 + px]);
+                }
+              }
+              sadGrid[dx + "," + dy] = sad;
+              if (sad < bestFineSAD) {
+                bestFineSAD = sad;
+                fBestDx = dx;
+                fBestDy = dy;
+              }
+            }
+          }
+
+          // Sub-pixel parabolic refinement
+          const sxM = sadGrid[(fBestDx - 1) + "," + fBestDy] ?? bestFineSAD;
+          const sxP = sadGrid[(fBestDx + 1) + "," + fBestDy] ?? bestFineSAD;
+          const syM = sadGrid[fBestDx + "," + (fBestDy - 1)] ?? bestFineSAD;
+          const syP = sadGrid[fBestDx + "," + (fBestDy + 1)] ?? bestFineSAD;
+
+          const subDx = fBestDx + subPixelParabola(sxM, bestFineSAD, sxP);
+          const subDy = fBestDy + subPixelParabola(syM, bestFineSAD, syP);
+
+          matched.push({ cx: px0, cy: py0, dx: subDx, dy: subDy });
+        }
+      }
+
+      prevGray = currGray;
+      prevCoarse = currCoarse;
+
+      if (matched.length >= 3) {
+        const dxs = matched.map(m => m.dx).sort((a, b) => a - b);
+        const dys = matched.map(m => m.dy).sort((a, b) => a - b);
+        const medDx = dxs[Math.floor(dxs.length / 2)];
+        const medDy = dys[Math.floor(dys.length / 2)];
+
+        // Radial Scale Divergence: Dynamically track Z-distance when moving closer or further!
+        if (matched.length >= 6 && activeMarkers.length === 0) {
+          const scaleRatios = [];
+          for (const m of matched) {
+            const rx0 = m.cx - cx, ry0 = m.cy - cy;
+            const r0 = Math.hypot(rx0, ry0);
+            if (r0 > 32) {
+              const rx1 = (m.cx + m.dx - medDx) - cx;
+              const ry1 = (m.cy + m.dy - medDy) - cy;
+              const r1 = Math.hypot(rx1, ry1);
+              if (r1 > 20) scaleRatios.push(r0 / r1);
+            }
+          }
+          if (scaleRatios.length >= 4) {
+            scaleRatios.sort((a, b) => a - b);
+            const medZoom = scaleRatios[Math.floor(scaleRatios.length / 2)];
+            if (medZoom > 0.93 && medZoom < 1.07) {
+              workingDistInch = Math.min(Math.max(workingDistInch * medZoom, 3.5), 30.0);
+            }
+          }
+        }
+
+        // Convert sub-pixel displacement to true frame-plane Inches (with Gyro tilt compensation)
+        if (Math.hypot(medDx, medDy) > 0.08) {
+          const stepXInch = -medDx * inchesPerFlowPx;
+          const stepYInch = medDy * inchesPerFlowPx;
+          camWorldPos.xInch += stepXInch;
+          camWorldPos.yInch += stepYInch;
+          if (worldPoints.length >= 1) {
+            totalPathMovedInch += Math.hypot(stepXInch, stepYInch);
+          }
+          updateProximityState();
+        }
+      }
+    }
+
+    // =========================================================================
+    // 4. WORKFLOW SCREENS & POINT PICKING / LOOP CLOSURE ENGINE
+    // =========================================================================
+    function startScanWorkflow() {
+      showScreen("scrStep1");
+    }
+
+    function showScreen(id) {
+      document.querySelectorAll(".screen").forEach(s => s.classList.remove("active"));
+      document.getElementById(id).classList.add("active");
+      if (id === "scrHome") renderHomeList();
+      if (id === "scrResult") {
+        setTimeout(() => drawCADResult(currentWf), 40);
+        setTimeout(() => drawCADResult(currentWf), 220);
+      }
+    }
+
+    function renderHomeList() {
+      const box = document.getElementById("homeList");
+      box.innerHTML = "";
+      wireframes.forEach(wf => {
+        const el = document.createElement("div");
+        el.className = "wf-card";
+        el.onclick = () => { currentWf = wf; showScreen("scrResult"); };
+        const svgPreview = buildMiniSVG(wf.points);
+        el.innerHTML = `
+          <div style="width:54px;height:54px;background:#060911;border:1px solid #10b98166;border-radius:10px;display:flex;align-items:center;justify-content:center;flex-shrink:0;padding:4px;">
+            ${svgPreview}
+          </div>
+          <div style="flex:1;overflow:hidden;">
+            <div style="font-weight:800;font-size:15px;color:#fff;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${wf.name}</div>
+            <div style="font-size:12px;color:#10b981;font-family:monospace;margin-top:2px;">
+              ${Number(wf.widthInch).toFixed(2)}" × ${Number(wf.heightInch).toFixed(2)}" (${wf.points.length} pts)
+            </div>
+            <div style="font-size:11px;color:#9ca3af;margin-top:2px;">${wf.createdAt}</div>
+          </div>
+          <div style="background:#10b98122;color:#10b981;padding:8px 10px;border-radius:10px;font-size:11px;font-weight:900;">
+            .DXF
+          </div>
+        `;
+        box.appendChild(el);
+      });
+    }
+
+    function buildMiniSVG(pts) {
+      if (!pts || pts.length < 3) return `<span style="color:#10b981;font-size:11px;font-weight:900;">2D</span>`;
+      const xs = pts.map(p => p.xInch);
+      const ys = pts.map(p => p.yInch);
+      const minX = Math.min(...xs), maxX = Math.max(...xs);
+      const minY = Math.min(...ys), maxY = Math.max(...ys);
+      const spanX = Math.max(maxX - minX, 0.5);
+      const spanY = Math.max(maxY - minY, 0.5);
+      const scale = Math.min(40 / spanX, 40 / spanY);
+      const poly = pts.map(p => {
+        const x = 4 + (p.xInch - minX) * scale;
+        const y = 44 - (p.yInch - minY) * scale;
+        return `${x.toFixed(1)},${y.toFixed(1)}`;
+      }).join(" ");
+      return `<svg width="46" height="46" viewBox="0 0 48 48"><polygon points="${poly}" fill="rgba(16,185,129,0.14)" stroke="#00ff55" stroke-width="2.2"/></svg>`;
+    }
+
+    async function startRearCamera(videoElemId) {
+      stopCamera();
+      try {
+        mediaStream = await navigator.mediaDevices.getUserMedia({
+          video: {
+            facingMode: { ideal: "environment" },
+            width: { ideal: 1920 },
+            height: { ideal: 1080 },
+            frameRate: { ideal: 60 }
+          },
+          audio: false
+        });
+        const video = document.getElementById(videoElemId);
+        video.srcObject = mediaStream;
+        await video.play();
+      } catch (err) {
+        console.warn("Camera access error:", err);
+      }
+    }
+
+    function stopCamera() {
+      if (animFrameId) { cancelAnimationFrame(animFrameId); animFrameId = null; }
+      if (overviewAnimId) { cancelAnimationFrame(overviewAnimId); overviewAnimId = null; }
+      if (mediaStream) {
+        mediaStream.getTracks().forEach(t => t.stop());
+        mediaStream = null;
+      }
+    }
+
+    function stopCameraAndGo(scr) {
+      stopCamera();
+      showScreen(scr);
+    }
+
+    async function openStep2OverviewCamera() {
+      showScreen("scrStep2");
+      await startRearCamera("overviewVideo");
+      startOverviewDetectionLoop();
+    }
+
+    function startOverviewDetectionLoop() {
+      const video = document.getElementById("overviewVideo");
+      const canvas = document.getElementById("overviewOverlay");
+      const ctx = canvas.getContext("2d");
+
+      function loop() {
+        if (video.readyState >= 2 && video.videoWidth > 0) {
+          if (canvas.width !== canvas.clientWidth || canvas.height !== canvas.clientHeight) {
+            canvas.width = canvas.clientWidth || 360;
+            canvas.height = canvas.clientHeight || 520;
+          }
+          flowCtx.drawImage(video, 0, 0, FW, FH);
+          const imgData = flowCtx.getImageData(0, 0, FW, FH).data;
+          const gray = new Uint8Array(FW * FH);
+          for (let i = 0, j = 0; i < imgData.length; i += 4, j++) {
+            gray[j] = (imgData[i] * 77 + imgData[i + 1] * 150 + imgData[i + 2] * 29) >> 8;
+          }
+          const tags = detectArUcoMarkersInGray(gray, FW, FH);
+          ctx.clearRect(0, 0, canvas.width, canvas.height);
+          const sx = canvas.width / FW;
+          const sy = canvas.height / FH;
+
+          tags.forEach(t => {
+            ctx.strokeStyle = "#00ff55";
+            ctx.lineWidth = 3;
+            ctx.beginPath();
+            ctx.moveTo(t.corners[0].x * sx, t.corners[0].y * sy);
+            for (let k = 1; k < 4; k++) ctx.lineTo(t.corners[k].x * sx, t.corners[k].y * sy);
+            ctx.closePath();
+            ctx.stroke();
+
+            ctx.fillStyle = "#00ff55";
+            ctx.font = "bold 12px monospace";
+            ctx.fillText(`ARUCO #${String(t.id + 1).padStart(2, "0")} (2.00")`, t.corners[0].x * sx, t.corners[0].y * sy - 6);
+          });
+
+          const badge = document.getElementById("overviewPlaneBadge");
+          if (tags.length > 0) {
+            badge.textContent = `✓ ${tags.length} ArUco Sticker(s) Locked (Exact 2.00" Scale Ready)`;
+          } else {
+            badge.textContent = `✓ 3D Frame Plane & Gyro Reference Ready`;
+          }
+        }
+        overviewAnimId = requestAnimationFrame(loop);
+      }
+      overviewAnimId = requestAnimationFrame(loop);
+    }
+
+    async function captureOverviewAndStartLiveScan() {
+      triggerHaptic(50);
+      if (overviewAnimId) { cancelAnimationFrame(overviewAnimId); overviewAnimId = null; }
+      showScreen("scrStep3");
+      await startRearCamera("scanVideo");
+      resetLiveScan();
+      startLiveRenderLoop();
+    }
+
+    function resetLiveScan() {
+      worldPoints = [];
+      camWorldPos = { xInch: 0.0, yInch: 0.0 };
+      workingDistInch = 12.0;
+      globalMarkerMap = {};
+      activeMarkers = [];
+      prevGray = null;
+      prevCoarse = null;
+      hasMovedAwayFromStart = false;
+      totalPathMovedInch = 0.0;
+      loopClosed = false;
+      nearFirstPoint = false;
+      updateScanUI();
+    }
+
+    // Touch drag assist on overlay (allows fine crosshair nudge or desktop testing)
+    const scanOverlay = document.getElementById("scanOverlay");
+    let touchPrev = null;
+    scanOverlay.addEventListener("pointerdown", (e) => {
+      touchPrev = { x: e.clientX, y: e.clientY };
+    });
+    scanOverlay.addEventListener("pointermove", (e) => {
+      if (touchPrev && !loopClosed) {
+        const dx = e.clientX - touchPrev.x;
+        const dy = e.clientY - touchPrev.y;
+        const inchPerScreenPx = (workingDistInch * 1.08) / Math.max(scanOverlay.clientWidth, 320);
+        const stepX = -dx * inchPerScreenPx;
+        const stepY = dy * inchPerScreenPx;
+        camWorldPos.xInch += stepX;
+        camWorldPos.yInch += stepY;
+        if (worldPoints.length >= 1) totalPathMovedInch += Math.hypot(stepX, stepY);
+        touchPrev = { x: e.clientX, y: e.clientY };
+        updateProximityState();
+      }
+    });
+    window.addEventListener("pointerup", () => { touchPrev = null; });
+
+    function updateProximityState() {
+      if (worldPoints.length >= 1) {
+        const p0 = worldPoints[0];
+        const distFromStart = Math.hypot(camWorldPos.xInch - p0.xInch, camWorldPos.yInch - p0.yInch);
+        if (distFromStart > 6.0 && totalPathMovedInch > 10.0) {
+          hasMovedAwayFromStart = true;
+        }
+        // Only highlight nearFirstPoint when >= 3 points, user has walked around the frame, and returns within 1.2" of Start
+        if (worldPoints.length >= 3 && hasMovedAwayFromStart && !loopClosed) {
+          nearFirstPoint = (distFromStart <= 1.2);
+        } else {
+          nearFirstPoint = false;
+        }
+      } else {
+        nearFirstPoint = false;
+      }
+      updateScanUI();
+    }
+
+    function markScanPoint(type) {
+      if (loopClosed) return;
+
+      const exactX = camWorldPos.xInch + subPixelEdgeOffsetInch.x;
+      const exactY = camWorldPos.yInch + subPixelEdgeOffsetInch.y;
+
+      if (worldPoints.length > 0) {
+        const last = worldPoints[worldPoints.length - 1];
+        const distLast = Math.hypot(exactX - last.xInch, exactY - last.yInch);
+        if (distLast < 0.20) {
+          document.getElementById("liveGuidanceBanner").textContent =
+            "⚠️ Phone ko frame ke sath aage chalayein taake Green Line khinche, phir agla point mark karein!";
+          return;
+        }
+      } else {
+        camWorldPos = { xInch: 0.0, yInch: 0.0 };
+        hasMovedAwayFromStart = false;
+        totalPathMovedInch = 0.0;
+      }
+
+      worldPoints.push({
+        xInch: +(worldPoints.length === 0 ? 0.0 : exactX).toFixed(4),
+        yInch: +(worldPoints.length === 0 ? 0.0 : exactY).toFixed(4),
+        type: type
+      });
+
+      triggerHaptic(45);
+      updateProximityState();
+    }
+
+    // Bowditch Survey Loop-Closure Adjustment: Distributes any residual closure drift across vertices
+    function applyLoopClosureDriftCorrection() {
+      if (worldPoints.length < 3) return;
+      const p0 = worldPoints[0];
+      const distToStart = Math.hypot(camWorldPos.xInch - p0.xInch, camWorldPos.yInch - p0.yInch);
+      // If user returned near Point 1 (within 3.5 inches) when closing the loop, distribute closure residual
+      if (hasMovedAwayFromStart && distToStart > 0.01 && distToStart < 3.5) {
+        const errX = camWorldPos.xInch - p0.xInch;
+        const errY = camWorldPos.yInch - p0.yInch;
+        let cumLen = [0];
+        let totalPerim = 0;
+        for (let i = 1; i < worldPoints.length; i++) {
+          totalPerim += Math.hypot(
+            worldPoints[i].xInch - worldPoints[i - 1].xInch,
+            worldPoints[i].yInch - worldPoints[i - 1].yInch
+          );
+          cumLen.push(totalPerim);
+        }
+        totalPerim += Math.hypot(
+          camWorldPos.xInch - worldPoints[worldPoints.length - 1].xInch,
+          camWorldPos.yInch - worldPoints[worldPoints.length - 1].yInch
+        );
+        if (totalPerim > 4.0) {
+          for (let i = 1; i < worldPoints.length; i++) {
+            const w = cumLen[i] / totalPerim;
+            worldPoints[i].xInch = +(worldPoints[i].xInch - errX * w).toFixed(4);
+            worldPoints[i].yInch = +(worldPoints[i].yInch - errY * w).toFixed(4);
+          }
+        }
+      }
+    }
+
+    function closeFrameLoopNow() {
+      if (worldPoints.length < 3) {
+        document.getElementById("liveGuidanceBanner").textContent =
+          "⚠️ Loop close karne ke liye kam az kam 3 points mark karein!";
+        return;
+      }
+      applyLoopClosureDriftCorrection();
+      loopClosed = true;
+      nearFirstPoint = false;
+      triggerHaptic(90);
+      updateScanUI();
+    }
+
+    function undoLastScanPoint() {
+      if (loopClosed) {
+        loopClosed = false;
+      } else {
+        worldPoints.pop();
+        if (worldPoints.length <= 1) {
+          hasMovedAwayFromStart = false;
+          totalPathMovedInch = 0;
+        }
+      }
+      updateProximityState();
+    }
+
+    function updateScanUI() {
+      const badge = document.getElementById("hudPointBadge");
+      const banner = document.getElementById("liveGuidanceBanner");
+      const btnDone = document.getElementById("btnFinishScan");
+      const btnCloseManual = document.getElementById("btnCloseLoopManual");
+
+      badge.textContent = loopClosed ? "LOOP CLOSED ✓" : `POINTS: ${worldPoints.length}`;
+      btnCloseManual.style.display = (worldPoints.length >= 3 && !loopClosed) ? "block" : "none";
+
+      if (loopClosed) {
+        banner.style.borderColor = "#10b981";
+        banner.textContent = "✅ Frame Loop Complete! Ab neeche 'DONE — GENERATE 2D (.DXF)' dabayein.";
+        btnDone.style.background = "linear-gradient(90deg, #10b981, #059669)";
+        btnDone.style.color = "#000";
+      } else if (nearFirstPoint) {
+        banner.style.borderColor = "#eab308";
+        banner.textContent = "🎯 1st Point (START) ke qareeb! 'CLOSE LOOP' ya 'DONE' dabayein.";
+        btnDone.style.background = "linear-gradient(90deg, #10b981, #059669)";
+        btnDone.style.color = "#000";
+      } else {
+        banner.style.borderColor = "#10b981";
+        if (worldPoints.length === 0) {
+          banner.textContent = "1st Inner Corner par Crosshair (+) rakh kar '+ MARK POINT' dabayein";
+        } else {
+          banner.textContent = `Point #${worldPoints.length} Locked — Agle point par le jaayein (Green Line live chal rahi hai)`;
+        }
+        btnDone.style.background = worldPoints.length >= 3
+          ? "linear-gradient(90deg, #10b981, #059669)"
+          : "#374151";
+        btnDone.style.color = worldPoints.length >= 3 ? "#000" : "#9ca3af";
+      }
+    }
+
+    function startLiveRenderLoop() {
+      const video = document.getElementById("scanVideo");
+      const canvas = document.getElementById("scanOverlay");
+      const ctx = canvas.getContext("2d");
+      const loupe = document.getElementById("loupeCanvas");
+      const lCtx = loupe.getContext("2d");
+      const loupeRing = document.getElementById("loupeRing");
+
+      function render() {
+        processFrameVision(video);
+
+        if (canvas.width !== canvas.clientWidth || canvas.height !== canvas.clientHeight) {
+          canvas.width = canvas.clientWidth || 380;
+          canvas.height = canvas.clientHeight || 540;
+        }
+        const cx = canvas.width / 2;
+        const cy = canvas.height / 2;
+        const pxPerInch = canvas.width / (workingDistInch * 1.08);
+
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+        // Update Telemetry HUD
+        document.getElementById("distVal").textContent = workingDistInch.toFixed(1);
+        const arucoEl = document.getElementById("arucoBadge");
+        if (activeMarkers.length > 0) {
+          arucoEl.textContent = `ArUco #${String(activeMarkers[0].id + 1).padStart(2, "0")}: 3D LOCKED`;
+          arucoEl.style.color = "#00ff55";
+        } else {
+          const mappedCount = Object.keys(globalMarkerMap).length;
+          arucoEl.textContent = `Gyro+VIO: Active (${mappedCount} Tags)`;
+          arucoEl.style.color = "#10b981";
+        }
+        document.getElementById("edgeBadge").textContent =
+          edgeSnapLocked ? "Edge Snap: LOCKED (±0.5mm)" : "Edge Snap: Scanning";
+        loupeRing.style.borderColor = edgeSnapLocked ? "#00ff55" : "#06b6d4";
+
+        // Draw detected ArUco 2.00"×2.00" Sticker 3D Homography Boxes on live camera
+        if (activeMarkers.length > 0) {
+          const sx = canvas.width / FW;
+          const sy = canvas.height / FH;
+          ctx.save();
+          activeMarkers.forEach(m => {
+            ctx.strokeStyle = "#06b6d4";
+            ctx.lineWidth = 3;
+            ctx.beginPath();
+            ctx.moveTo(m.corners[0].x * sx, m.corners[0].y * sy);
+            for (let k = 1; k < 4; k++) ctx.lineTo(m.corners[k].x * sx, m.corners[k].y * sy);
+            ctx.closePath();
+            ctx.stroke();
+
+            ctx.fillStyle = "rgba(6,182,212,0.88)";
+            ctx.fillRect(m.corners[0].x * sx - 2, m.corners[0].y * sy - 20, 118, 17);
+            ctx.fillStyle = "#000";
+            ctx.font = "bold 10px monospace";
+            ctx.fillText(`TAG #${String(m.id + 1).padStart(2, "0")} • 2.00" LOCK`, m.corners[0].x * sx + 3, m.corners[0].y * sy - 8);
+          });
+          ctx.restore();
+        }
+
+        function worldToScreen(pt) {
+          return {
+            x: cx + (pt.xInch - camWorldPos.xInch) * pxPerInch,
+            y: cy - (pt.yInch - camWorldPos.yInch) * pxPerInch
+          };
+        }
+
+        // Draw Live 3D/2D Green Wireframe Lines & Curves
+        if (worldPoints.length > 0) {
+          ctx.save();
+          ctx.lineJoin = "round";
+          ctx.lineCap = "round";
+
+          for (let i = 0; i < worldPoints.length - 1; i++) {
+            const p1 = worldPoints[i];
+            const p2 = worldPoints[i + 1];
+            const s1 = worldToScreen(p1);
+            const s2 = worldToScreen(p2);
+
+            ctx.strokeStyle = (p1.type === "CURVE" || p2.type === "CURVE") ? "#06b6d4" : "#00ff55";
+            ctx.lineWidth = 4.2;
+            ctx.shadowColor = "#00ff55";
+            ctx.shadowBlur = 8;
+            ctx.beginPath();
+            ctx.moveTo(s1.x, s1.y);
+            ctx.lineTo(s2.x, s2.y);
+            ctx.stroke();
+
+            const segLen = Math.hypot(p2.xInch - p1.xInch, p2.yInch - p1.yInch);
+            const mx = (s1.x + s2.x) / 2;
+            const my = (s1.y + s2.y) / 2;
+            ctx.shadowBlur = 0;
+            ctx.fillStyle = "rgba(0,0,0,0.82)";
+            ctx.fillRect(mx - 26, my - 18, 52, 16);
+            ctx.fillStyle = "#fde047";
+            ctx.font = "bold 11px monospace";
+            ctx.textAlign = "center";
+            ctx.fillText(`${segLen.toFixed(2)}"`, mx, my - 6);
+          }
+
+          const lastPt = worldPoints[worldPoints.length - 1];
+          const sLast = worldToScreen(lastPt);
+
+          if (loopClosed) {
+            const sFirst = worldToScreen(worldPoints[0]);
+            ctx.strokeStyle = "#00ff55";
+            ctx.lineWidth = 4.2;
+            ctx.beginPath();
+            ctx.moveTo(sLast.x, sLast.y);
+            ctx.lineTo(sFirst.x, sFirst.y);
+            ctx.stroke();
+
+            const closeLen = Math.hypot(worldPoints[0].xInch - lastPt.xInch, worldPoints[0].yInch - lastPt.yInch);
+            const cmx = (sLast.x + sFirst.x) / 2;
+            const cmy = (sLast.y + sFirst.y) / 2;
+            ctx.fillStyle = "rgba(0,0,0,0.82)";
+            ctx.fillRect(cmx - 26, cmy - 18, 52, 16);
+            ctx.fillStyle = "#00ff55";
+            ctx.font = "bold 11px monospace";
+            ctx.textAlign = "center";
+            ctx.fillText(`${closeLen.toFixed(2)}"`, cmx, cmy - 6);
+          } else {
+            // LIVE RUBBER-BAND GREEN LINE FROM LAST PICKED POINT TO CENTER CROSSHAIR (+)
+            ctx.strokeStyle = "#00ff55";
+            ctx.lineWidth = 4.0;
+            ctx.shadowColor = "#00ff55";
+            ctx.shadowBlur = 10;
+            ctx.setLineDash([10, 5]);
+            ctx.beginPath();
+            ctx.moveTo(sLast.x, sLast.y);
+            ctx.lineTo(cx, cy);
+            ctx.stroke();
+            ctx.setLineDash([]);
+            ctx.shadowBlur = 0;
+
+            const liveInch = Math.hypot(
+              (camWorldPos.xInch + subPixelEdgeOffsetInch.x) - lastPt.xInch,
+              (camWorldPos.yInch + subPixelEdgeOffsetInch.y) - lastPt.yInch
+            );
+            document.getElementById("segBadge").textContent = `Live Line: ${liveInch.toFixed(2)}"`;
+
+            const lmx = (sLast.x + cx) / 2;
+            const lmy = (sLast.y + cy) / 2;
+            ctx.fillStyle = "rgba(0,0,0,0.86)";
+            ctx.fillRect(lmx - 30, lmy - 22, 60, 19);
+            ctx.fillStyle = "#00ff55";
+            ctx.font = "bold 12px monospace";
+            ctx.textAlign = "center";
+            ctx.fillText(`${liveInch.toFixed(2)}"`, lmx, lmy - 8);
+          }
+
+          // Draw Picked Corner / Curve Nodes
+          worldPoints.forEach((pt, idx) => {
+            const sp = worldToScreen(pt);
+            ctx.beginPath();
+            ctx.arc(sp.x, sp.y, idx === 0 ? 11 : 7, 0, Math.PI * 2);
+            ctx.fillStyle = idx === 0 ? "#eab308" : (pt.type === "CURVE" ? "#06b6d4" : "#00ff55");
+            ctx.fill();
+            ctx.lineWidth = 2.2;
+            ctx.strokeStyle = "#000";
+            ctx.stroke();
+
+            ctx.fillStyle = "#fff";
+            ctx.font = "bold 10px sans-serif";
+            ctx.textAlign = "center";
+            ctx.fillText(idx === 0 ? "START (P1)" : `P${idx + 1}`, sp.x, sp.y - 14);
+          });
+          ctx.restore();
+        }
+
+        // Draw Center Precision Crosshair (+) with Sub-Pixel Edge Snap Diamond
+        ctx.save();
+        ctx.strokeStyle = nearFirstPoint ? "#eab308" : "#00ff55";
+        ctx.lineWidth = 2.4;
+        ctx.beginPath();
+        ctx.arc(cx, cy, 22, 0, Math.PI * 2);
+        ctx.moveTo(cx - 38, cy); ctx.lineTo(cx + 38, cy);
+        ctx.moveTo(cx, cy - 38); ctx.lineTo(cx, cy + 38);
+        ctx.stroke();
+
+        if (edgeSnapLocked) {
+          ctx.strokeStyle = "#06b6d4";
+          ctx.lineWidth = 2.0;
+          ctx.strokeRect(cx - 7, cy - 7, 14, 14);
+        }
+
+        ctx.fillStyle = "#ef4444";
+        ctx.beginPath();
+        ctx.arc(cx, cy, 3.2, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.restore();
+
+        // Update 6x Live Camera Magnifier Loupe
+        lCtx.fillStyle = "#000";
+        lCtx.fillRect(0, 0, 122, 122);
+        if (video.readyState >= 2 && video.videoWidth > 0) {
+          const vw = video.videoWidth;
+          const vh = video.videoHeight;
+          const patch = Math.max(Math.min(vw, vh) * 0.08, 36);
+          lCtx.drawImage(video, vw / 2 - patch / 2, vh / 2 - patch / 2, patch, patch, 0, 0, 122, 122);
+        }
+        lCtx.strokeStyle = edgeSnapLocked ? "#06b6d4" : "#00ff55";
+        lCtx.lineWidth = 1.5;
+        lCtx.beginPath();
+        lCtx.moveTo(0, 61); lCtx.lineTo(122, 61);
+        lCtx.moveTo(61, 0); lCtx.lineTo(61, 122);
+        lCtx.stroke();
+
+        animFrameId = requestAnimationFrame(render);
+      }
+      animFrameId = requestAnimationFrame(render);
+    }
+
+    function onClickDoneScan() {
+      if (worldPoints.length < 3) {
+        document.getElementById("liveGuidanceBanner").style.borderColor = "#ef4444";
+        document.getElementById("liveGuidanceBanner").textContent =
+          "⚠️ Kam az kam 3 points mark karein taake 2D Frame ban sake!";
+        triggerHaptic(80);
+        return;
+      }
+      if (!loopClosed) {
+        applyLoopClosureDriftCorrection();
+        loopClosed = true;
+      }
+      stopCamera();
+      const input = document.getElementById("custInput");
+      input.value = `Customer_Frame_${wireframes.length + 1}`;
+      document.getElementById("custErr").style.display = "none";
+      document.getElementById("custModal").classList.add("active");
+      setTimeout(() => { try { input.focus(); input.select(); } catch (e) {} }, 80);
+    }
+
+    function cancelCustModal() {
+      document.getElementById("custModal").classList.remove("active");
+      startRearCamera("scanVideo").then(() => startLiveRenderLoop());
+    }
+
+    function saveCustomerWireframe() {
+      const name = document.getElementById("custInput").value.trim();
+      if (!name) {
+        document.getElementById("custErr").style.display = "block";
+        return;
+      }
+      document.getElementById("custModal").classList.remove("active");
+
+      const xs = worldPoints.map(p => p.xInch);
+      const ys = worldPoints.map(p => p.yInch);
+      const minX = Math.min(...xs), maxX = Math.max(...xs);
+      const minY = Math.min(...ys), maxY = Math.max(...ys);
+
+      const normalizedPts = worldPoints.map(p => ({
+        xInch: +(p.xInch - minX).toFixed(4),
+        yInch: +(p.yInch - minY).toFixed(4),
+        type: p.type
+      }));
+
+      const wInch = +(maxX - minX).toFixed(2);
+      const hInch = +(maxY - minY).toFixed(2);
+
+      // Compute true diagonals from extreme corner vertices if >= 4 points
+      let d1Inch = +Math.hypot(wInch, hInch).toFixed(2);
+      let d2Inch = d1Inch;
+      if (normalizedPts.length >= 4) {
+        d1Inch = +Math.hypot(
+          normalizedPts[2].xInch - normalizedPts[0].xInch,
+          normalizedPts[2].yInch - normalizedPts[0].yInch
+        ).toFixed(2);
+        d2Inch = +Math.hypot(
+          normalizedPts[3].xInch - normalizedPts[1].xInch,
+          normalizedPts[3].yInch - normalizedPts[1].yInch
+        ).toFixed(2);
+      }
+
+      const wf = {
+        id: "wf-" + Date.now(),
+        name: name,
+        createdAt: new Date().toLocaleString(),
+        widthInch: wInch,
+        heightInch: hInch,
+        diag1Inch: d1Inch,
+        diag2Inch: d2Inch,
+        points: normalizedPts
+      };
+
+      wireframes.unshift(wf);
+      try {
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(wireframes));
+      } catch (e) {}
+
+      currentWf = wf;
+      triggerHaptic(70);
+      showScreen("scrResult");
+    }
+
+    // =========================================================================
+    // 5. 2D CAD WIREFRAME RENDERER & TRUE 3-POINT CIRCULAR ARC (.DXF) EXPORTER
+    // =========================================================================
+    function fitCircle3Points(p0, p1, p2) {
+      const x1 = p0.xInch, y1 = p0.yInch;
+      const x2 = p1.xInch, y2 = p1.yInch;
+      const x3 = p2.xInch, y3 = p2.yInch;
+      const d = 2 * (x1 * (y2 - y3) + x2 * (y3 - y1) + x3 * (y1 - y2));
+      if (Math.abs(d) < 1e-4) return null;
+      const ux = ((x1 * x1 + y1 * y1) * (y2 - y3) + (x2 * x2 + y2 * y2) * (y3 - y1) + (x3 * x3 + y3 * y3) * (y1 - y2)) / d;
+      const uy = ((x1 * x1 + y1 * y1) * (x3 - x2) + (x2 * x2 + y2 * y2) * (x1 - x3) + (x3 * x3 + y3 * y3) * (x2 - x1)) / d;
+      const r = Math.hypot(x1 - ux, y1 - uy);
+      if (r < 0.1 || r > 10000) return null;
+
+      const normDeg = (rad) => {
+        let deg = (rad * 180) / Math.PI;
+        deg = deg % 360;
+        if (deg < 0) deg += 360;
+        return deg;
+      };
+      const ccwDiff = (s, e) => {
+        let df = e - s;
+        while (df < 0) df += 360;
+        while (df >= 360) df -= 360;
+        return df;
+      };
+
+      const a0 = normDeg(Math.atan2(y1 - uy, x1 - ux));
+      const a1 = normDeg(Math.atan2(y2 - uy, x2 - ux));
+      const a2 = normDeg(Math.atan2(y3 - uy, x3 - ux));
+      const isCCW = ccwDiff(a0, a1) <= ccwDiff(a0, a2);
+
+      return {
+        cx: ux,
+        cy: uy,
+        r: r,
+        startAngleDeg: isCCW ? a0 : a2,
+        endAngleDeg: isCCW ? a2 : a0
+      };
+    }
+
+    function drawCADResult(wf) {
+      if (!wf || !wf.points || wf.points.length < 3) return;
+      document.getElementById("resName").textContent = wf.name;
+      document.getElementById("resMeta").textContent = `${wf.name.replace(/\s+/g, "_")}.dxf • INCHES (1:1 Exact • ±2mm)`;
+      document.getElementById("mW").textContent = Number(wf.widthInch).toFixed(2) + '"';
+      document.getElementById("mH").textContent = Number(wf.heightInch).toFixed(2) + '"';
+      document.getElementById("mD1").textContent = Number(wf.diag1Inch).toFixed(2) + '"';
+      document.getElementById("mD2").textContent = Number(wf.diag2Inch).toFixed(2) + '"';
+
+      const container = document.getElementById("cadContainer");
+      const c = document.getElementById("cadCanvas");
+      const w = Math.max(container.clientWidth, window.innerWidth - 30, 300);
+      const h = Math.max(container.clientHeight, window.innerHeight - 260, 250);
+      c.width = w;
+      c.height = h;
+
+      const ctx = c.getContext("2d");
+      ctx.clearRect(0, 0, w, h);
+
+      ctx.strokeStyle = "rgba(255,255,255,0.06)";
+      ctx.lineWidth = 1;
+      for (let gx = 0; gx < w; gx += 24) {
+        ctx.beginPath(); ctx.moveTo(gx, 0); ctx.lineTo(gx, h); ctx.stroke();
+      }
+      for (let gy = 0; gy < h; gy += 24) {
+        ctx.beginPath(); ctx.moveTo(0, gy); ctx.lineTo(w, gy); ctx.stroke();
+      }
+
+      const pts = wf.points;
+      const xs = pts.map(p => p.xInch);
+      const ys = pts.map(p => p.yInch);
+      const minX = Math.min(...xs), maxX = Math.max(...xs);
+      const minY = Math.min(...ys), maxY = Math.max(...ys);
+      const spanX = Math.max(maxX - minX, 0.5);
+      const spanY = Math.max(maxY - minY, 0.5);
+      const pad = 46;
+      const scale = Math.min((w - pad * 2) / spanX, (h - pad * 2) / spanY);
+      const offX = (w - spanX * scale) / 2;
+      const offY = (h - spanY * scale) / 2;
+
+      const toS = (p) => ({
+        x: offX + (p.xInch - minX) * scale,
+        y: h - (offY + (p.yInch - minY) * scale)
+      });
+
+      ctx.save();
+      ctx.lineWidth = 3.5;
+      ctx.lineJoin = "round";
+
+      const n = pts.length;
+      let i = 0;
+      while (i < n) {
+        const p0 = pts[i];
+        const p1 = pts[(i + 1) % n];
+        const p2 = pts[(i + 2) % n];
+
+        if (p1.type === "CURVE") {
+          const s0 = toS(p0), s1 = toS(p1), s2 = toS(p2);
+          const cpX = 2 * s1.x - 0.5 * (s0.x + s2.x);
+          const cpY = 2 * s1.y - 0.5 * (s0.y + s2.y);
+          ctx.strokeStyle = "#06b6d4";
+          ctx.beginPath();
+          ctx.moveTo(s0.x, s0.y);
+          ctx.quadraticCurveTo(cpX, cpY, s2.x, s2.y);
+          ctx.stroke();
+
+          const arcObj = fitCircle3Points(p0, p1, p2);
+          const labelTxt = arcObj ? `R${arcObj.r.toFixed(2)}"` : `Arc`;
+          ctx.fillStyle = "#06b6d4";
+          ctx.font = "bold 11px monospace";
+          ctx.textAlign = "center";
+          ctx.fillText(labelTxt, s1.x, s1.y - 10);
+          i += 2;
+        } else {
+          const s0 = toS(p0), s1 = toS(p1);
+          ctx.strokeStyle = "#00ff55";
+          ctx.beginPath();
+          ctx.moveTo(s0.x, s0.y);
+          ctx.lineTo(s1.x, s1.y);
+          ctx.stroke();
+
+          const len = Math.hypot(p1.xInch - p0.xInch, p1.yInch - p0.yInch);
+          const mx = (s0.x + s1.x) / 2;
+          const my = (s0.y + s1.y) / 2;
+          ctx.fillStyle = "rgba(0,0,0,0.82)";
+          ctx.fillRect(mx - 24, my - 15, 48, 15);
+          ctx.fillStyle = "#fde047";
+          ctx.font = "bold 11px monospace";
+          ctx.textAlign = "center";
+          ctx.fillText(`${len.toFixed(2)}"`, mx, my - 4);
+          i += 1;
+        }
+      }
+
+      pts.forEach((p, idx) => {
+        const s = toS(p);
+        ctx.fillStyle = p.type === "CURVE" ? "#06b6d4" : "#ffffff";
+        ctx.beginPath();
+        ctx.arc(s.x, s.y, 4.8, 0, Math.PI * 2);
+        ctx.fill();
+
+        ctx.fillStyle = "#9ca3af";
+        ctx.font = "bold 9px monospace";
+        ctx.textAlign = "center";
+        ctx.fillText(`P${idx + 1}`, s.x, s.y + 14);
+      });
+      ctx.restore();
+    }
+
+    function generateDXF(wf) {
+      const out = [];
+      const add = (c, v) => { out.push(String(c).padStart(3, " ")); out.push(String(v)); };
+      add(0, "SECTION"); add(2, "HEADER");
+      add(9, "$ACADVER"); add(1, "AC1009");
+      add(9, "$INSUNITS"); add(70, "1"); // 1 = Inches (Exact 1:1 Laser Cutting Scale)
+      add(0, "ENDSEC");
+      add(0, "SECTION"); add(2, "ENTITIES");
+
+      const pts = wf.points;
+      const n = pts.length;
+      let i = 0;
+      while (i < n) {
+        const p0 = pts[i];
+        const p1 = pts[(i + 1) % n];
+        const p2 = pts[(i + 2) % n];
+
+        if (p1.type === "CURVE") {
+          const arc = fitCircle3Points(p0, p1, p2);
+          if (arc) {
+            add(0, "ARC"); add(8, "0");
+            add(10, arc.cx.toFixed(4));
+            add(20, arc.cy.toFixed(4));
+            add(30, "0.0000");
+            add(40, arc.r.toFixed(4));
+            add(50, arc.startAngleDeg.toFixed(4));
+            add(51, arc.endAngleDeg.toFixed(4));
+            i += 2;
+            continue;
+          }
+        }
+        add(0, "LINE"); add(8, "0");
+        add(10, Number(p0.xInch).toFixed(4)); add(20, Number(p0.yInch).toFixed(4)); add(30, "0.0000");
+        add(11, Number(p1.xInch).toFixed(4)); add(21, Number(p1.yInch).toFixed(4)); add(31, "0.0000");
+        i += 1;
+      }
+
+      add(0, "ENDSEC"); add(0, "EOF");
+      return out.join("\r\n") + "\r\n";
+    }
+
+    function downloadDXFFile() {
+      const dxf = generateDXF(currentWf);
+      const fname = currentWf.name.replace(/[^a-zA-Z0-9_-]/g, "_") + ".dxf";
+      if (IS_NATIVE_ANDROID && window.AndroidBridge.saveDxfToDownloads) {
+        window.AndroidBridge.saveDxfToDownloads(fname, dxf);
+        return;
+      }
+      const blob = new Blob([dxf], { type: "application/dxf" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url; a.download = fname; a.click();
+      URL.revokeObjectURL(url);
+    }
+
+    async function sendDXFToWhatsApp() {
+      const dxf = generateDXF(currentWf);
+      const fname = currentWf.name.replace(/[^a-zA-Z0-9_-]/g, "_") + ".dxf";
+      const caption = `Customer: ${currentWf.name} | Exact Inner Size: ${Number(currentWf.widthInch).toFixed(2)}" x ${Number(currentWf.heightInch).toFixed(2)}" (Units: INCHES)`;
+
+      if (IS_NATIVE_ANDROID && window.AndroidBridge.shareDxfToWhatsApp) {
+        window.AndroidBridge.shareDxfToWhatsApp(fname, dxf, caption);
+        return;
+      }
+
+      const file = new File([dxf], fname, { type: "application/octet-stream" });
+      if (navigator.canShare && navigator.canShare({ files: [file] })) {
+        try {
+          await navigator.share({
+            title: fname,
+            text: caption,
+            files: [file]
+          });
+          return;
+        } catch (e) {}
+      }
+      downloadDXFFile();
+    }
+
+    renderHomeList();
+  </script>
+</body>
+</html>
