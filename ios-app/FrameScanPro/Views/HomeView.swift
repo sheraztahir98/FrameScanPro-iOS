@@ -18,8 +18,7 @@ struct HomeView: View {
     @ObservedObject var storage = StorageManager.shared
     @State private var activeStep: ScanWorkflowStep?
     @State private var selectedWireframe: SavedWireframe?
-    @State private var shareURL: URL?
-    @State private var showShareSheet = false
+    @State private var shareItem: ShareableDXFItem?
     
     var body: some View {
         NavigationStack {
@@ -91,10 +90,8 @@ struct HomeView: View {
             .sheet(item: $selectedWireframe) { wf in
                 WireframeResultView(wireframe: wf)
             }
-            .sheet(isPresented: $showShareSheet) {
-                if let url = shareURL {
-                    ShareSheetView(activityItems: [url])
-                }
+            .sheet(item: $shareItem) { item in
+                ShareSheetView(activityItems: [item.url])
             }
         }
     }
@@ -184,8 +181,7 @@ struct HomeView: View {
     
     private func shareWireframeOnWhatsApp(_ item: SavedWireframe) {
         if let url = try? DXFGenerator.exportDXFFile(for: item) {
-            shareURL = url
-            showShareSheet = true
+            shareItem = ShareableDXFItem(url: url)
         }
     }
 }
