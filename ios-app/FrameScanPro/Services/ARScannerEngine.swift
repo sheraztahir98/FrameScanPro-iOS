@@ -236,11 +236,12 @@ final class ARScannerEngine: NSObject, ObservableObject, ARSCNViewDelegate, ARSe
         let camForward = -SIMD3<Float>(camTransform.columns.2.x, camTransform.columns.2.y, camTransform.columns.2.z)
         
         // Apply sub-pixel edge snap offset to the camera ray direction
-        let rayDir = simd_normalize(
-            camForward +
-            camRight * Float(subPixelOffsetNorm.x) * 0.015 +
-            camUp * Float(subPixelOffsetNorm.y) * 0.015
-        )
+        let dxScale: Float = Float(subPixelOffsetNorm.x) * 0.015
+        let dyScale: Float = Float(subPixelOffsetNorm.y) * 0.015
+        let offsetRight: SIMD3<Float> = camRight * dxScale
+        let offsetUp: SIMD3<Float> = camUp * dyScale
+        let rawRay: SIMD3<Float> = camForward + offsetRight + offsetUp
+        let rayDir: SIMD3<Float> = simd_normalize(rawRay)
         
         var rawHitPos: SIMD3<Float>?
         
