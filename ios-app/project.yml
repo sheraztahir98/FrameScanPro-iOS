@@ -1,6 +1,7 @@
 name: FrameScanPro
 options:
   bundleIdPrefix: com.framescan
+  xcodeVersion: "15.0"
   deploymentTarget:
     iOS: "16.0"
 targets:
